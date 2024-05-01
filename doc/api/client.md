@@ -1,8 +1,8 @@
 ## Authentication and Authorization
 
-**POST** `/auth/login`
+**POST** `/api/auth/login`
 
-**GET** `/auth/token`
+**GET** `/api/auth/token`
 
 ## Timeline and Notification
 
@@ -14,16 +14,16 @@
 
 ## Users
 
-**GET** `/users/<username>`
+**GET** `/api/users/<username>`
 
-**POST** `/users/<username>`
+**GET** `/api/users/<username>/posts`
 
 ## Posts
 
-**GET** `/posts/<postId>`
+**GET** `/api/posts/<postId>`
 
-**POST** `/posts`
+**PUT** `/api/posts`
 
-**UPDATE** `/posts/<postId>`
+**POST** `/api/posts/<postId>`
 
-**DELETE** `/posts/<postId>`
+**DELETE** `/api/posts/<postId>`
