@@ -11,13 +11,9 @@ func routeAuth(router fiber.Router) {
 }
 
 func login(c *fiber.Ctx) error {
-	fmt.Println("POST /api/auth/login")
 	c.SendStatus(fiber.StatusOK)
-	return nil
 }
 
 func refreshToken(c *fiber.Ctx) error {
-	fmt.Println("GET /api/auth/token")
 	c.SendStatus(fiber.StatusOK)
-	return nil
 }

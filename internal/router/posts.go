@@ -6,34 +6,39 @@ import (
 )
 
 func routePosts(router fiber.Router) {
-	router.Put("/", newPost)
 	router.Get("/:postId", getPost)
+	router.Put("/", newPost)
 	router.Post("/:postId", editPost)
 	router.Delete("/:postId", removePost)
+	router.Put("/:postId/like", like)
+	router.Delete("/:postId/like", unlike)
 }
 
 func newPost(c *fiber.Ctx) error {
-	fmt.Println("PUT /api/posts")
 	c.SendStatus(fiber.StatusOK)
-	return nil
 }
 
 func getPost(c *fiber.Ctx) error {
 	postId := c.Params("postId")
-	fmt.Printf("GET /api/posts/%s\n", postId)
-	return c.SendStatus(fiber.StatusOK)
+	c.SendStatus(fiber.StatusOK)
 }
 
 func editPost(c *fiber.Ctx) error {
 	postId := c.Params("postId")
-	fmt.Printf("POST /api/posts/%s\n", postId)
 	c.SendStatus(fiber.StatusOK)
-	return nil
 }
 
 func removePost(c *fiber.Ctx) error {
 	postId := c.Params("postId")
-	fmt.Printf("DELETE /api/posts/%s\n", postId)
 	c.SendStatus(fiber.StatusOK)
-	return nil
+}
+
+func like(c *fiber.Ctx) error {
+	postId := c.Params("postId")
+	c.SendStatus(fiber.StatusOK)
+}
+
+func unlike(c *fiber.Ctx) error {
+	postId := c.Params("postId")
+	c.SendStatus(fiber.StatusOK)
 }
