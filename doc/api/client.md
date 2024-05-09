@@ -29,7 +29,7 @@ RETURN: 200, 401, 500
 }
 ```
 
-### GET `/api/auth/token`
+### POST `/api/auth/token`
 
 SEND:
 ```json
@@ -95,10 +95,6 @@ NOT IMPLEMENTED
 RETURN: 200, 404, 500  
 ```json
 {
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  },
   "id": "string(url)",
   "username": "string",
   "bio": "string",
@@ -121,10 +117,6 @@ OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 RETURN: 200, 401, 403, 404, 500  
 ```json
 {
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }, // ONLY WHEN PROVIDED SESSION AND TOKEN
   "list": [
     {
       "id": "string(url)",
@@ -151,10 +143,6 @@ OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 RETURN: 200, 401, 403, 404, 500  
 ```json
 {
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }, // ONLY WHEN PROVIDED SESSION AND TOKEN
   "list": [
     {
       "id": "string(url)",
@@ -176,10 +164,6 @@ OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 RETURN: 200, 401, 403, 404, 500  
 ```json
 {
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }, // ONLY WHEN PROVIDED SESSION AND TOKEN
   "list": [
     {
       "id": "string(url)",
