@@ -5,7 +5,7 @@ import (
 )
 
 func Route(app *fiber.App) {
-	app.Use("/api", func (c *fiber.Ctx) error {
+	app.Use("/api", func(c *fiber.Ctx) error {
 		c.Accepts("application/json")
 		return c.Next()
 	})
