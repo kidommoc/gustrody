@@ -17,6 +17,13 @@ type OauthToken struct {
 	Refresh string `json:"refresh"`
 }
 
+func NewOauth(u string, s string) *OauthToken {
+	return &OauthToken{
+		Token:   generateToken(u, s, TOKEN_EXPIRE),
+		Refresh: generateToken(u, s, REFRESH_EXPIRE),
+	}
+}
+
 func generateSession() string {
 	return utils.GenerateRamdonHexString(32)
 }
@@ -49,7 +56,6 @@ func VerifyToken(token string, session string) (username string, err error) {
 		return []byte("penguin"), nil // should loaded from .env
 	})
 
-	// error
 	if !parsed.Valid {
 		switch {
 		case errors.Is(err, jwt.ErrTokenExpired):
@@ -74,34 +80,24 @@ func VerifyToken(token string, session string) (username string, err error) {
 	return username, nil
 }
 
-func Login(username string, password string) (session string, oauth *OauthToken, err error) {
-	p, err := db.GetPasswordOfUser(username)
+func Login(username string, password string) (session string, oauth OauthToken, err error) {
+	p, err := db.QueryPasswordOfUser(username)
 	if err != nil {
-		// handle error: user not found
-		return "", nil, err
+		return "", oauth, errors.New("user not found")
 	}
 	if p != password {
-		// handle error: incorrect password
-		return "", nil, errors.New("incorrect password")
+		return "", oauth, errors.New("incorrect password")
 	}
 	session = generateSession()
 	db.SetSession(session, username)
-	oauth = &OauthToken{
-		Token:   generateToken(username, session, TOKEN_EXPIRE),
-		Refresh: generateToken(username, session, REFRESH_EXPIRE),
-	}
-	return session, oauth, nil
+	return session, *NewOauth(username, session), nil
 }
 
-func RefreshToken(session string, refresh string) (oauth *OauthToken, err error) {
+func RefreshToken(session string, refresh string) (oauth OauthToken, err error) {
 	/* validate */
 	username, err := VerifyToken(refresh, session)
 	if err != nil {
-		return nil, err
+		return oauth, err
 	}
-	oauth = &OauthToken{
-		Token:   generateToken(username, session, TOKEN_EXPIRE),
-		Refresh: generateToken(username, session, REFRESH_EXPIRE),
-	}
-	return oauth, nil
+	return *NewOauth(username, session), nil
 }

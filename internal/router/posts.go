@@ -8,11 +8,11 @@ import (
 
 func routePosts(router fiber.Router) {
 	router.Get("/:postId", getPost)
-	router.Put("/", Auth, newPost)
-	router.Post("/:postId", Auth, editPost)
-	router.Delete("/:postId", Auth, removePost)
-	router.Put("/:postId/like", Auth, like)
-	router.Delete("/:postId/like", Auth, unlike)
+	router.Put("/", mAuth, newPost)
+	router.Post("/:postId", mAuth, editPost)
+	router.Delete("/:postId", mAuth, removePost)
+	router.Put("/:postId/like", mAuth, like)
+	router.Delete("/:postId/like", mAuth, unlike)
 }
 
 func newPost(c *fiber.Ctx) error {

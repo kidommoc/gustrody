@@ -2,23 +2,38 @@ package router
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/kidommoc/gustrody/internal/users"
 )
 
 func routeUsers(router fiber.Router) {
-	router.Get("/:username", getUserInfo)
+	router.Get("/:username", getUserProfile)
 	router.Get("/:username/posts", getUserPosts)
 	router.Get("/:username/followings", getUserFollowings)
 	router.Get("/:username/followers", getUserFollowers)
-	router.Put("/follow/:username", Auth, follow)
-	router.Delete("/follow/:username", Auth, unfollow)
+	router.Put("/follow/:username", mAuth, follow)
+	router.Delete("/follow/:username", mAuth, unfollow)
 }
 
-func getUserInfo(c *fiber.Ctx) error {
+func getUserProfile(c *fiber.Ctx) error {
 	username := c.Params("username")
+	profile, err := users.GetUserProfile(username)
+	if err != nil {
+		switch {
+		case err.Error() == "user not found":
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(err.Error())
+		default:
+			c.Status(fiber.StatusInternalServerError)
+			return c.SendString(err.Error())
+		}
+	}
+
 	fmt.Printf("[USERS]GET: request for %s\n", username)
-	return c.SendStatus(fiber.StatusOK)
+	c.Status(fiber.StatusOK)
+	return c.JSON(profile)
 }
 
 func getUserPosts(c *fiber.Ctx) error {
@@ -29,26 +44,92 @@ func getUserPosts(c *fiber.Ctx) error {
 
 func getUserFollowings(c *fiber.Ctx) error {
 	username := c.Params("username")
+	list, err := users.GetUserFollowings(username)
+	if err != nil {
+		switch {
+		case err.Error() == "user not found":
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(err.Error())
+		default:
+			c.Status(fiber.StatusInternalServerError)
+			return c.SendString(err.Error())
+		}
+	}
+
 	fmt.Printf("[USERS]GET: request for followings of %s\n", username)
-	return c.SendStatus(fiber.StatusOK)
+	c.Status(fiber.StatusOK)
+	return c.JSON(fiber.Map{
+		"list": list,
+	})
 }
 
 func getUserFollowers(c *fiber.Ctx) error {
 	username := c.Params("username")
+	list, err := users.GetUserFollowers(username)
+	if err != nil {
+		switch {
+		case err.Error() == "user not found":
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(err.Error())
+		default:
+			c.Status(fiber.StatusInternalServerError)
+			return c.SendString(err.Error())
+		}
+	}
+
 	fmt.Printf("[USERS]GET: request for followers of %s\n", username)
-	return c.SendStatus(fiber.StatusOK)
+	c.Status(fiber.StatusOK)
+	return c.JSON(fiber.Map{
+		"list": list,
+	})
 }
 
 func follow(c *fiber.Ctx) error {
 	target := c.Params("username")
-	username := c.Locals("username")
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		return c.SendStatus(fiber.StatusUnauthorized)
+	}
+	err := users.Follow(strings.Clone(username), strings.Clone(target))
+	if err != nil {
+		switch {
+		case err.Error() == "try to self-follow":
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString(err.Error())
+		case err.Error() == "acting user not found":
+		case err.Error() == "target user not found":
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(err.Error())
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
 	fmt.Printf("[USERS]FOLLOW: %s follows %s\n", username, target)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func unfollow(c *fiber.Ctx) error {
 	target := c.Params("username")
-	username := c.Locals("username")
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		return c.SendStatus(fiber.StatusUnauthorized)
+	}
+	err := users.Unfollow(strings.Clone(username), strings.Clone(target))
+	if err != nil {
+		switch {
+		case err.Error() == "try to self-follow":
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString(err.Error())
+		case err.Error() == "acting user not found":
+		case err.Error() == "target user not found":
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(err.Error())
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
 	fmt.Printf("[USERS]UNFOLLOW: %s unfollows %s\n", username, target)
 	return c.SendStatus(fiber.StatusOK)
 }
