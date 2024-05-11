@@ -33,18 +33,14 @@ RETURN: 200, 401, 500
 
 SEND:
 ```json
-{
-  "session": "string",
-  "refresh": "string"
-}
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
+REQUIRE PROVIDING REFRESH TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 500  
 ```json
-{
-  "token": "string",
-  "refresh": "string"
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ## Timeline and Notification
@@ -53,7 +49,7 @@ RETURN: 200, 401, 500
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
@@ -66,7 +62,7 @@ NOT IMPLEMENTED
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
@@ -79,7 +75,7 @@ NOT IMPLEMENTED
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
@@ -110,12 +106,15 @@ RETURN: 200, 404, 500
 
 SEND:
 ```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session 
+OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
 OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 403, 404, 500  
 ```json
+// ONLY WHEN PROVIDED SESSION AND TOKEN
+HEADER: Token
+HEADER: Refresh
 {
   "list": [
     {
@@ -136,12 +135,15 @@ RETURN: 200, 401, 403, 404, 500
 
 SEND:
 ```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session 
+OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
 OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 403, 404, 500  
 ```json
+// ONLY WHEN PROVIDED SESSION AND TOKEN
+HEADER: Token
+HEADER: Refresh
 {
   "list": [
     {
@@ -157,12 +159,15 @@ RETURN: 200, 401, 403, 404, 500
 
 SEND:
 ```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session 
+OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
 OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 403, 404, 500  
 ```json
+// ONLY WHEN PROVIDED SESSION AND TOKEN
+HEADER: Token
+HEADER: Refresh
 {
   "list": [
     {
@@ -178,36 +183,28 @@ RETURN: 200, 401, 403, 404, 500
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 404, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ### DELETE `/api/users/follow/<username>`
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 404, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ## Posts
@@ -216,17 +213,16 @@ RETURN: 200, 401, 404, 500
 
 SEND:
 ```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session 
+OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
 OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 403, 404, 500  
 ```json
+// ONLY WHEN PROVIDED SESSION AND TOKEN
+HEADER: Token
+HEADER: Refresh
 {
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }, // ONLY WHEN PROVIDED SESSION AND TOKEN
   "id": "string(url)",
   "user": {
     "id": "string(url)",
@@ -242,7 +238,7 @@ RETURN: 200, 401, 403, 404, 500
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 {
   "content": "string"
@@ -251,19 +247,15 @@ REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 
 RETURN: 200, 401, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ### POST `/api/posts/<postId>`
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 {
   "content": "string"
@@ -272,64 +264,48 @@ REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 
 RETURN: 200, 401, 404, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  },
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ### DELETE `/api/posts/<postId>`
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 404, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ### PUT `/api/posts/<postId>/like`
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 403, 404, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }
-}
+HEADER: Token
+HEADER: Refresh
 ```
 
 ### DELETE `/api/posts/<postId>/like`
 
 SEND:
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session 
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
 REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
 ```
 
 RETURN: 200, 401, 403, 404, 500  
 ```json
-{
-  "auth": {
-    "token": "string",
-    "refresh": "string"
-  }
-}
+HEADER: Token
+HEADER: Refresh
 ```
