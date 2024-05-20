@@ -1,6 +1,8 @@
 package db
 
-import "errors"
+import (
+	"github.com/kidommoc/gustrody/internal/utils"
+)
 
 // should implemented with Redis
 
@@ -14,18 +16,18 @@ func initAuthDb() {
 	loginDb["u4"] = "penguin"
 }
 
-func QueryPasswordOfUser(username string) (password string, err error) {
+func QueryPasswordOfUser(username string) (password string, err utils.Err) {
 	passwd := loginDb[username]
 	if passwd == "" {
-		return "", errors.New("user not found")
+		return "", utils.NewErr(ErrNotFound, "user")
 	}
 	return passwd, nil
 }
 
-func QueryUserOfSession(session string) (username string, err error) {
+func QueryUserOfSession(session string) (username string, err utils.Err) {
 	username = sessionDb[session]
 	if username == "" {
-		return "", errors.New("user not found")
+		return "", utils.NewErr(ErrNotFound, "user")
 	}
 	return username, nil
 }

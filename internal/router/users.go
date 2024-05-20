@@ -25,13 +25,12 @@ func getUserProfile(c *fiber.Ctx) error {
 	}
 	profile, err := users.GetProfile(username)
 	if err != nil {
-		switch {
-		case err.Error() == "user not found":
+		switch err.Code() {
+		case users.ErrNotFound:
 			c.Status(fiber.StatusNotFound)
-			return c.SendString(err.Error())
+			return c.SendString("User not found.")
 		default:
-			c.Status(fiber.StatusInternalServerError)
-			return c.SendString(err.Error())
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
@@ -58,13 +57,12 @@ func getUserFollowings(c *fiber.Ctx) error {
 	}
 	list, err := users.GetFollowings(username)
 	if err != nil {
-		switch {
-		case err.Error() == "user not found":
+		switch err.Code() {
+		case users.ErrNotFound:
 			c.Status(fiber.StatusNotFound)
-			return c.SendString(err.Error())
+			return c.SendString("User not found.")
 		default:
-			c.Status(fiber.StatusInternalServerError)
-			return c.SendString(err.Error())
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
@@ -83,13 +81,12 @@ func getUserFollowers(c *fiber.Ctx) error {
 	}
 	list, err := users.GetFollowers(username)
 	if err != nil {
-		switch {
-		case err.Error() == "user not found":
+		switch err.Code() {
+		case users.ErrNotFound:
 			c.Status(fiber.StatusNotFound)
-			return c.SendString(err.Error())
+			return c.SendString("User not found.")
 		default:
-			c.Status(fiber.StatusInternalServerError)
-			return c.SendString(err.Error())
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
@@ -112,14 +109,13 @@ func follow(c *fiber.Ctx) error {
 	}
 	err := users.Follow(strings.Clone(username), strings.Clone(target))
 	if err != nil {
-		switch {
-		case err.Error() == "try to self-follow":
+		switch err.Code() {
+		case users.ErrSelfFollow:
 			c.Status(fiber.StatusBadRequest)
-			return c.SendString(err.Error())
-		case err.Error() == "acting user not found":
-		case err.Error() == "target user not found":
+			return c.SendString("Try to self-follow")
+		case users.ErrNotFound:
 			c.Status(fiber.StatusNotFound)
-			return c.SendString(err.Error())
+			return c.SendString(fmt.Sprintf("User not found: %s", err.Error()))
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
@@ -141,14 +137,13 @@ func unfollow(c *fiber.Ctx) error {
 	}
 	err := users.Unfollow(strings.Clone(username), strings.Clone(target))
 	if err != nil {
-		switch {
-		case err.Error() == "try to self-follow":
+		switch err.Code() {
+		case users.ErrSelfFollow:
 			c.Status(fiber.StatusBadRequest)
-			return c.SendString(err.Error())
-		case err.Error() == "acting user not found":
-		case err.Error() == "target user not found":
+			return c.SendString("Try to self-unfollow")
+		case users.ErrNotFound:
 			c.Status(fiber.StatusNotFound)
-			return c.SendString(err.Error())
+			return c.SendString(fmt.Sprintf("User not found: %s", err.Error()))
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}

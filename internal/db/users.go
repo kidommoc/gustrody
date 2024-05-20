@@ -1,7 +1,7 @@
 package db
 
 import (
-	"errors"
+	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 type User struct {
@@ -58,16 +58,16 @@ func checkFollow(from string, to string) int {
 	return -1
 }
 
-func QueryUser(username string) (user User, err error) {
+func QueryUser(username string) (user *User, err utils.Err) {
 	if !checkUser(username) {
-		return user, errors.New("username not found")
+		return user, utils.NewErr(ErrNotFound, "user")
 	}
-	return *infoDb[username], nil
+	return infoDb[username], nil
 }
 
-func QueryUserFollows(username string) (count uint, err error) {
+func QueryUserFollows(username string) (count uint, err utils.Err) {
 	if !checkUser(username) {
-		return 0, errors.New("user not found")
+		return 0, utils.NewErr(ErrNotFound, "user")
 	}
 	count = 0
 	for _, f := range followsDb {
@@ -78,9 +78,9 @@ func QueryUserFollows(username string) (count uint, err error) {
 	return count, nil
 }
 
-func QueryUserFollowed(username string) (count uint, err error) {
+func QueryUserFollowed(username string) (count uint, err utils.Err) {
 	if !checkUser(username) {
-		return 0, errors.New("username not found")
+		return 0, utils.NewErr(ErrNotFound, "user")
 	}
 	count = 0
 	for _, f := range followsDb {
@@ -91,10 +91,10 @@ func QueryUserFollowed(username string) (count uint, err error) {
 	return count, nil
 }
 
-func QueryUserFollowings(username string) (list []*User, err error) {
+func QueryUserFollowings(username string) (list []*User, err utils.Err) {
 	list = make([]*User, 0)
 	if !checkUser(username) {
-		return list, errors.New("username not found")
+		return list, utils.NewErr(ErrNotFound, "user")
 	}
 	for _, f := range followsDb {
 		if f.From == username {
@@ -104,10 +104,10 @@ func QueryUserFollowings(username string) (list []*User, err error) {
 	return list, nil
 }
 
-func QueryUserFollowers(username string) (list []*User, err error) {
+func QueryUserFollowers(username string) (list []*User, err utils.Err) {
 	list = make([]*User, 0)
 	if !checkUser(username) {
-		return list, errors.New("username not found")
+		return list, utils.NewErr(ErrNotFound, "user")
 	}
 	for _, f := range followsDb {
 		if f.To == username {
@@ -117,15 +117,12 @@ func QueryUserFollowers(username string) (list []*User, err error) {
 	return list, nil
 }
 
-func SetFollow(from string, to string) error {
-	if from == to {
-		return errors.New("from and to are same")
-	}
+func SetFollow(from string, to string) utils.Err {
 	if !checkUser(from) {
-		return errors.New("from not found")
+		return utils.NewErr(ErrNotFound, "from")
 	}
 	if !checkUser(to) {
-		return errors.New("to not found")
+		return utils.NewErr(ErrNotFound, "to")
 	}
 	if index := checkFollow(from, to); index == -1 {
 		followsDb = append(followsDb, &follow{From: from, To: to})
@@ -133,15 +130,12 @@ func SetFollow(from string, to string) error {
 	return nil
 }
 
-func UnsetFollow(from string, to string) error {
-	if from == to {
-		return errors.New("from and to are same")
-	}
+func UnsetFollow(from string, to string) utils.Err {
 	if !checkUser(from) {
-		return errors.New("from not found")
+		return utils.NewErr(ErrNotFound, "from")
 	}
 	if !checkUser(to) {
-		return errors.New("to not found")
+		return utils.NewErr(ErrNotFound, "to")
 	}
 	if index := checkFollow(from, to); index != -1 {
 		followsDb[index] = followsDb[len(followsDb)-1]

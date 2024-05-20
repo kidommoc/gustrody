@@ -7,4 +7,6 @@ func Init() {
 	fmt.Println("[DB]Initailized AuthDb")
 	initUserDb()
 	fmt.Println("[DB]Initailized UserDb")
+	initPostDb()
+	fmt.Println("[DB]Initailized PostDb")
 }

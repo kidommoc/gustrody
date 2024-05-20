@@ -1,9 +1,8 @@
 package users
 
 import (
-	"errors"
-
 	"github.com/kidommoc/gustrody/internal/db"
+	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 var site = "localhost:8000" // should load from .env
@@ -26,50 +25,60 @@ func generateID(username string) string {
 	return site + "/users/" + username
 }
 
-func GetProfile(username string) (info UserProfile, err error) {
-	u, err := db.QueryUser(username)
-	if err != nil {
-		return info, errors.New("user not found")
+func GetInfo(username string) (info UserInfo, err utils.Err) {
+	u, e := db.QueryUser(username)
+	if e != nil {
+		return info, utils.NewErr(ErrNotFound)
 	}
+	info.ID = generateID(u.Username)
+	info.Username = u.Username
+	return info, nil
+}
+
+func GetProfile(username string) (info UserProfile, err utils.Err) {
+	u, e := db.QueryUser(username)
+	if e != nil {
+		return info, utils.NewErr(ErrNotFound)
+	}
+	info.ID = generateID(u.Username)
 	info.Username = u.Username
 	info.Bio = u.Bio
-	if info.Follows, err = db.QueryUserFollows(username); err != nil {
-		return info, errors.New("user not found")
+	if info.Follows, e = db.QueryUserFollows(username); e != nil {
+		// should not reach here now
 	}
-	if info.Followed, err = db.QueryUserFollowed(username); err != nil {
-		return info, errors.New("user not found")
+	if info.Followed, e = db.QueryUserFollowed(username); e != nil {
+		// should not reach here now
 	}
-	info.ID = site + "/users/" + username
 	info.Followings = info.ID + "/followings"
 	info.Followers = info.ID + "/followers"
 	return info, nil
 }
 
-func GetFollowings(username string) (list []*UserInfo, err error) {
+func GetFollowings(username string) (list []*UserInfo, err utils.Err) {
 	list = make([]*UserInfo, 0)
-	l, err := db.QueryUserFollowings(username)
-	if err != nil {
-		return list, errors.New("user not found")
+	l, e := db.QueryUserFollowings(username)
+	if e != nil {
+		return list, utils.NewErr(ErrNotFound)
 	}
-	for _, e := range l {
+	for _, u := range l {
 		list = append(list, &UserInfo{
-			ID:       generateID(e.Username),
-			Username: e.Username,
+			ID:       generateID(u.Username),
+			Username: u.Username,
 		})
 	}
 	return list, nil
 }
 
-func GetFollowers(username string) (list []*UserInfo, err error) {
+func GetFollowers(username string) (list []*UserInfo, err utils.Err) {
 	list = make([]*UserInfo, 0)
-	l, err := db.QueryUserFollowers(username)
-	if err != nil {
-		return list, errors.New("user not found")
+	l, e := db.QueryUserFollowers(username)
+	if e != nil {
+		return list, utils.NewErr(ErrNotFound)
 	}
-	for _, e := range l {
+	for _, u := range l {
 		list = append(list, &UserInfo{
-			ID:       generateID(e.Username),
-			Username: e.Username,
+			ID:       generateID(u.Username),
+			Username: u.Username,
 		})
 	}
 	return list, nil

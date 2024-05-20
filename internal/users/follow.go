@@ -1,21 +1,20 @@
 package users
 
 import (
-	"errors"
-
 	"github.com/kidommoc/gustrody/internal/db"
+	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func Follow(actor string, target string) error {
+func Follow(actor string, target string) utils.Err {
 	if actor == target {
-		return errors.New("try to self-follow")
+		return utils.NewErr(ErrSelfFollow)
 	}
 	if err := db.SetFollow(actor, target); err != nil {
 		switch {
-		case err.Error() == "from not found":
-			return errors.New("acting user not found")
-		case err.Error() == "to not found":
-			return errors.New("target user not found")
+		case err.Code() == db.ErrNotFound && err.Error() == "from":
+			return utils.NewErr(ErrNotFound, "from")
+		case err.Code() == db.ErrNotFound && err.Error() == "to":
+			return utils.NewErr(ErrNotFound, "to")
 		default:
 			return err
 		}
@@ -23,16 +22,16 @@ func Follow(actor string, target string) error {
 	return nil
 }
 
-func Unfollow(actor string, target string) error {
+func Unfollow(actor string, target string) utils.Err {
 	if actor == target {
-		return errors.New("try to self-unfollow")
+		return utils.NewErr(ErrSelfFollow)
 	}
 	if err := db.UnsetFollow(actor, target); err != nil {
 		switch {
-		case err.Error() == "from not found":
-			return errors.New("acting user not found")
-		case err.Error() == "to not found":
-			return errors.New("target user not found")
+		case err.Code() == db.ErrNotFound && err.Error() == "from":
+			return utils.NewErr(ErrNotFound, "from")
+		case err.Code() == db.ErrNotFound && err.Error() == "to":
+			return utils.NewErr(ErrNotFound, "to")
 		default:
 			return err
 		}

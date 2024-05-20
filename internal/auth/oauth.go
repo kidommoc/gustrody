@@ -48,8 +48,8 @@ func generateToken(u string, s string, exp uint) string {
 	return signed
 }
 
-func VerifyToken(token string, session string) (username string, err error) {
-	parsed, err := jwt.Parse(token, func(tok *jwt.Token) (interface{}, error) {
+func VerifyToken(token string, session string) (username string, err utils.Err) {
+	parsed, e := jwt.Parse(token, func(tok *jwt.Token) (interface{}, error) {
 		if _, ok := tok.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("jwt method error")
 		}
@@ -58,42 +58,42 @@ func VerifyToken(token string, session string) (username string, err error) {
 
 	if !parsed.Valid {
 		switch {
-		case errors.Is(err, jwt.ErrTokenExpired):
-			return "", errors.New("token expired")
+		case errors.Is(e, jwt.ErrTokenExpired):
+			return "", utils.NewErr(ErrExpired)
 		default:
-			return "", errors.New("invalid token")
+			return "", utils.NewErr(ErrInvalid)
 		}
 	}
 
-	username, err = parsed.Claims.GetIssuer()
-	if err != nil {
-		return "", errors.New("invalid token")
+	username, e = parsed.Claims.GetIssuer()
+	if e != nil {
+		return "", utils.NewErr(ErrInvalid)
 	}
-	sess, err := parsed.Claims.GetSubject()
-	if err != nil {
-		return "", errors.New("invalid token")
+	sess, e := parsed.Claims.GetSubject()
+	if e != nil {
+		return "", utils.NewErr(ErrInvalid)
 	}
 
 	if sess != session {
-		return "", errors.New("unmatched session")
+		return "", utils.NewErr(ErrWrongSession)
 	}
 	return username, nil
 }
 
-func Login(username string, password string) (session string, oauth OauthToken, err error) {
+func Login(username string, password string) (session string, oauth OauthToken, err utils.Err) {
 	p, err := db.QueryPasswordOfUser(username)
 	if err != nil {
-		return "", oauth, errors.New("user not found")
+		return "", oauth, utils.NewErr(ErrUserNotFound)
 	}
 	if p != password {
-		return "", oauth, errors.New("incorrect password")
+		return "", oauth, utils.NewErr(ErrWrongPassword)
 	}
 	session = generateSession()
 	db.SetSession(session, username)
 	return session, *NewOauth(username, session), nil
 }
 
-func RefreshToken(session string, refresh string) (oauth OauthToken, err error) {
+func RefreshToken(session string, refresh string) (oauth OauthToken, err utils.Err) {
 	/* validate */
 	username, err := VerifyToken(refresh, session)
 	if err != nil {

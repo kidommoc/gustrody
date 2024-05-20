@@ -21,18 +21,27 @@ func mAuth(c *fiber.Ctx) error {
 	authroization := c.Get("Authorization")
 	if session == "" || authroization == "" {
 		c.Status(fiber.StatusUnauthorized)
-		return c.SendString("missing http header: session and authorization")
+		return c.SendString("Missing HTTP header: Session and/or Authorization")
 	}
 	// parse bearer to token
 	bearer := strings.Split(authroization, " ")
 	if len(bearer) != 2 || bearer[0] != "Bearer" {
 		c.Status(fiber.StatusUnauthorized)
-		return c.SendString("invalid header: authorization")
+		return c.SendString("Invalid header: Authorization.\nShould be Bearer token in JWT.")
 	}
 	username, err := auth.VerifyToken(bearer[1], session)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
-		return c.SendString(err.Error())
+		switch err.Code() {
+		case auth.ErrExpired:
+			return c.SendString("Token expired.")
+		case auth.ErrInvalid:
+			return c.SendString("Invalid token.")
+		case auth.ErrWrongSession:
+			return c.SendString("Session can't match.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
 	}
 	fmt.Printf("[AUTH]mAuth: %s at session %s\n", username, session)
 
@@ -57,8 +66,15 @@ func login(c *fiber.Ctx) error {
 
 	session, oauth, err := auth.Login(body.Username, body.Password)
 	if err != nil {
-		c.Status(401)
-		return c.SendString(err.Error())
+		c.Status(fiber.StatusUnauthorized)
+		switch err.Code() {
+		case auth.ErrUserNotFound:
+			return c.SendString("User not found.")
+		case auth.ErrWrongPassword:
+			return c.SendString("Incorrect password.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
 	}
 
 	fmt.Printf("[AUTH]LOGIN: succeed. session: %s\n", session)
