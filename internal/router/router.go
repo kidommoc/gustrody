@@ -13,4 +13,7 @@ func Route(app *fiber.App) {
 	routeAuth(api.Group("/auth"))
 	routeUsers(api.Group("/users"))
 	routePosts(api.Group("/posts"))
+	app.Use("/", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNotFound)
+	})
 }

@@ -19,7 +19,11 @@ func routeUsers(router fiber.Router) {
 
 func getUserProfile(c *fiber.Ctx) error {
 	username := c.Params("username")
-	profile, err := users.GetUserProfile(username)
+	if username == "" {
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
+	}
+	profile, err := users.GetProfile(username)
 	if err != nil {
 		switch {
 		case err.Error() == "user not found":
@@ -38,13 +42,21 @@ func getUserProfile(c *fiber.Ctx) error {
 
 func getUserPosts(c *fiber.Ctx) error {
 	username := c.Params("username")
+	if username == "" {
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
+	}
 	fmt.Printf("[USERS]GET: request for posts of %s\n", username)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func getUserFollowings(c *fiber.Ctx) error {
 	username := c.Params("username")
-	list, err := users.GetUserFollowings(username)
+	if username == "" {
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
+	}
+	list, err := users.GetFollowings(username)
 	if err != nil {
 		switch {
 		case err.Error() == "user not found":
@@ -65,7 +77,11 @@ func getUserFollowings(c *fiber.Ctx) error {
 
 func getUserFollowers(c *fiber.Ctx) error {
 	username := c.Params("username")
-	list, err := users.GetUserFollowers(username)
+	if username == "" {
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
+	}
+	list, err := users.GetFollowers(username)
 	if err != nil {
 		switch {
 		case err.Error() == "user not found":
@@ -86,6 +102,10 @@ func getUserFollowers(c *fiber.Ctx) error {
 
 func follow(c *fiber.Ctx) error {
 	target := c.Params("username")
+	if target == "" {
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire target username")
+	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
@@ -111,6 +131,10 @@ func follow(c *fiber.Ctx) error {
 
 func unfollow(c *fiber.Ctx) error {
 	target := c.Params("username")
+	if target == "" {
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire target username")
+	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)

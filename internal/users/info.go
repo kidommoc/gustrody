@@ -26,7 +26,7 @@ func generateID(username string) string {
 	return site + "/users/" + username
 }
 
-func GetUserProfile(username string) (info UserProfile, err error) {
+func GetProfile(username string) (info UserProfile, err error) {
 	u, err := db.QueryUser(username)
 	if err != nil {
 		return info, errors.New("user not found")
@@ -45,7 +45,7 @@ func GetUserProfile(username string) (info UserProfile, err error) {
 	return info, nil
 }
 
-func GetUserFollowings(username string) (list []*UserInfo, err error) {
+func GetFollowings(username string) (list []*UserInfo, err error) {
 	list = make([]*UserInfo, 0)
 	l, err := db.QueryUserFollowings(username)
 	if err != nil {
@@ -60,7 +60,7 @@ func GetUserFollowings(username string) (list []*UserInfo, err error) {
 	return list, nil
 }
 
-func GetUserFollowers(username string) (list []*UserInfo, err error) {
+func GetFollowers(username string) (list []*UserInfo, err error) {
 	list = make([]*UserInfo, 0)
 	l, err := db.QueryUserFollowers(username)
 	if err != nil {
