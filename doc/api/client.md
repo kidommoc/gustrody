@@ -10,7 +10,7 @@
 
 ## Authentication and Authorization
 
-### POST `/api/auth/login`
+### POST `/auth/login`
 
 SEND:
 ```json
@@ -29,7 +29,7 @@ RETURN: 200, 401, 500
 }
 ```
 
-### POST `/api/auth/token`
+### POST `/auth/token`
 
 SEND:
 ```json
@@ -45,7 +45,7 @@ HEADER: Refresh
 
 ## Timeline and Notification
 
-### GET `/api/home[?from=<?>]`
+### GET `/home[?from=<?>]`
 
 SEND:
 ```json
@@ -58,7 +58,7 @@ RETURN:
 NOT IMPLEMENTED
 ```
 
-### GET `/api/public[?from=<?>]`
+### GET `/public[?from=<?>]`
 
 SEND:
 ```json
@@ -71,7 +71,7 @@ RETURN:
 NOT IMPLEMENTED
 ```
 
-### GET `/api/notification[?from=<?>]`
+### GET `/notification[?from=<?>]`
 
 SEND:
 ```json
@@ -86,7 +86,7 @@ NOT IMPLEMENTED
 
 ## Users
 
-### GET `/api/users/<username>`
+### GET `/users/<username>`
 
 RETURN: 200, 404, 500  
 ```json
@@ -102,7 +102,7 @@ RETURN: 200, 404, 500
 }
 ```
 
-### GET `/api/users/<username>/posts`
+### GET `/users/<username>/posts`
 
 SEND:
 ```json
@@ -124,14 +124,14 @@ HEADER: Refresh
         "username": "string",
         "avatar": "string(url)" // NOT IMPLEMENETED
       },
-      "publishedAt": "string(utc)",
+      "publishedAt": "number(unix timestamp)",
       "content": "string"
     }, ...
   ]
 }
 ```
 
-### GET `/api/users/<username>/followings`
+### GET `/users/<username>/followings`
 
 SEND:
 ```json
@@ -155,7 +155,7 @@ HEADER: Refresh
 }
 ```
 
-### GET `/api/users/<username>/followers`
+### GET `/users/<username>/followers`
 
 SEND:
 ```json
@@ -179,7 +179,7 @@ HEADER: Refresh
 }
 ```
 
-### PUT `/api/users/follow/<username>`
+### PUT `/users/<username>/follow`
 
 SEND:
 ```json
@@ -193,7 +193,7 @@ HEADER: Token
 HEADER: Refresh
 ```
 
-### DELETE `/api/users/follow/<username>`
+### DELETE `/users/<username>/follow`
 
 SEND:
 ```json
@@ -209,7 +209,7 @@ HEADER: Refresh
 
 ## Posts
 
-### GET `/api/posts/<postId>`
+### GET `/posts/<postId>`
 
 SEND:
 ```json
@@ -229,12 +229,12 @@ HEADER: Refresh
     "username": "string",
     "avatar": "string(url)" // NOT IMPLEMENETED
   },
-  "publishedAt": "string(utc)",
+  "publishedAt": "number(unix timestamp)",
   "content": "string"
 }
 ```
 
-### PUT `/api/posts`
+### PUT `/posts`
 
 SEND:
 ```json
@@ -251,7 +251,7 @@ HEADER: Token
 HEADER: Refresh
 ```
 
-### POST `/api/posts/<postId>`
+### POST `/posts/<postId>`
 
 SEND:
 ```json
@@ -268,7 +268,7 @@ HEADER: Token
 HEADER: Refresh
 ```
 
-### DELETE `/api/posts/<postId>`
+### DELETE `/posts/<postId>`
 
 SEND:
 ```json
@@ -282,7 +282,7 @@ HEADER: Token
 HEADER: Refresh
 ```
 
-### PUT `/api/posts/<postId>/like`
+### PUT `/posts/<postId>/like`
 
 SEND:
 ```json
@@ -296,7 +296,35 @@ HEADER: Token
 HEADER: Refresh
 ```
 
-### DELETE `/api/posts/<postId>/like`
+### DELETE `/posts/<postId>/like`
+
+SEND:
+```json
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
+REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+```
+
+RETURN: 200, 401, 403, 404, 500  
+```json
+HEADER: Token
+HEADER: Refresh
+```
+
+### PUT `/posts/<postId>/share`
+
+SEND:
+```json
+REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
+REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+```
+
+RETURN: 200, 401, 403, 404, 500  
+```json
+HEADER: Token
+HEADER: Refresh
+```
+
+### DELETE `/posts/<postId>/share`
 
 SEND:
 ```json
