@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/kidommoc/gustrody/internal/posts"
 	"github.com/kidommoc/gustrody/internal/users"
 )
 
@@ -45,8 +46,21 @@ func getUserPosts(c *fiber.Ctx) error {
 		c.Status(fiber.StatusBadRequest)
 		c.SendString("Acquire username")
 	}
+
+	list, err := posts.GetByUser(username)
+	if err != nil {
+		switch err.Code() {
+		case posts.ErrUserNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("User not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
 	fmt.Printf("[USERS]GET: request for posts of %s\n", username)
-	return c.SendStatus(fiber.StatusOK)
+	c.Status(fiber.StatusOK)
+	return c.JSON(list)
 }
 
 func getUserFollowings(c *fiber.Ctx) error {

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,13 +11,20 @@ import (
 type Post struct {
 	ID      string
 	User    string
-	Date    string // should use timestamp
+	Date    int64
 	Content string
 }
 
 var postDb = make(map[string]*Post)
 
 func initPostDb() {
+	SetPost("u1", "1:u1u1u1u1")
+	time.Sleep(time.Second)
+	SetPost("u2", "1:u2u2u2u2")
+	time.Sleep(time.Second)
+	SetPost("u1", "2:u1u1u1u1")
+	time.Sleep(time.Second)
+	SetPost("u3", "1:u3u3u3u3")
 }
 
 func checkPost(id string) bool {
@@ -48,29 +56,37 @@ func QueryPostOwner(id string) (username string, err utils.Err) {
 }
 
 func QueryPostByID(id string) (post *Post, err utils.Err) {
-	post = postDb[id]
-	if post == nil {
+	if postDb[id] == nil {
 		return nil, utils.NewErr(ErrNotFound, "post")
 	}
-	return post, nil
+	p := *postDb[id]
+	return &p, nil
 }
 
-func QueryPostsByUser(user string) (list []*Post, err utils.Err) {
+func QueryPostsByUser(user string, asec bool) (l []*Post, err utils.Err) {
 	for _, v := range postDb {
 		if v.User == user {
-			list = append(list, v)
+			p := *v
+			l = append(l, &p)
 		}
 	}
-	return list, err
+	sort.Slice(l, func(i, j int) bool {
+		if asec {
+			return l[i].Date < l[j].Date
+		} else {
+			return l[i].Date > l[j].Date
+		}
+	})
+	return l, err
 }
 
 func SetPost(user string, content string) utils.Err {
 	id := uuid.New().String()
-	date := now()
+	date := time.Now()
 	p := &Post{
 		ID:      id,
 		User:    user,
-		Date:    date,
+		Date:    date.Unix(),
 		Content: content,
 	}
 	postDb[id] = p
@@ -83,7 +99,7 @@ func UpdatePost(id string, content string) utils.Err {
 		return utils.NewErr(ErrNotFound, "post")
 	}
 	p.Content = content
-	p.Date = now()
+	p.Date = time.Now().Unix()
 	return nil
 }
 
@@ -92,6 +108,6 @@ func RemovePost(id string) utils.Err {
 	if p == nil {
 		return utils.NewErr(ErrNotFound, "post")
 	}
-	postDb[id] = nil
+	delete(postDb, id)
 	return nil
 }
