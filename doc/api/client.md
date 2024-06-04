@@ -92,9 +92,10 @@ RETURN: 200, 404, 500
 ```json
 {
   "id": "string(url)",
-  "username": "string",
-  "bio": "string",
-  "avatar": "string(url)", // NOT IMPLEMENTED
+  "preferredUsername": "string",
+  "name": "string",
+  "summary": "string",
+  "icon": "string(url)", // NOT IMPLEMENTED
   "follows": "number(count)",
   "followings": "string(url)",
   "followed": "number(count)",
@@ -119,12 +120,13 @@ HEADER: Refresh
   "list": [
     {
       "id": "string(url)",
-      "user": {
+      "publisher": {
         "id": "string(url)",
-        "username": "string",
-        "avatar": "string(url)" // NOT IMPLEMENETED
+        "preferredUsername": "string",
+        "name": "string",
+        "icon": "string(url)" // NOT IMPLEMENETED
       },
-      "publishedAt": "number(unix timestamp)",
+      "publishedAt": "string(rfc3339)",
       "content": "string"
     }, ...
   ]
@@ -148,8 +150,9 @@ HEADER: Refresh
   "list": [
     {
       "id": "string(url)",
-      "username": "string",
-      "avatar": "string(url)" // NOT IMPLEMENETED
+      "preferredUsername": "string",
+      "name": "string",
+      "icon": "string(url)" // NOT IMPLEMENETED
     }, ...
   ]
 }
@@ -172,8 +175,9 @@ HEADER: Refresh
   "list": [
     {
       "id": "string(url)",
-      "username": "string",
-      "avatar": "string(url)" // NOT IMPLEMENETED
+      "preferredUsername": "string",
+      "name": "string",
+      "icon": "string(url)" // NOT IMPLEMENETED
     }, ...
   ]
 }
@@ -224,12 +228,13 @@ HEADER: Token
 HEADER: Refresh
 {
   "id": "string(url)",
-  "user": {
+  "publisher": {
     "id": "string(url)",
-    "username": "string",
-    "avatar": "string(url)" // NOT IMPLEMENETED
+    "preferredUsername": "string",
+    "name": "string",
+    "icon": "string(url)" // NOT IMPLEMENETED
   },
-  "publishedAt": "number(unix timestamp)",
+  "publishedAt": "string(rfc3339)",
   "content": "string"
 }
 ```
