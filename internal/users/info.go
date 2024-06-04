@@ -9,12 +9,13 @@ var site = "localhost:8000" // should load from .env
 
 type UserInfo struct {
 	ID       string `json:"id"`
-	Username string `json:"username"`
+	Username string `json:"preferredUsername"`
+	Nickname string `json:"name"`
 }
 
 type UserProfile struct {
 	UserInfo
-	Bio        string `json:"bio"`
+	Summary    string `json:"summary"`
 	Follows    uint   `json:"follows"`
 	Followings string `json:"followings"`
 	Followed   uint   `json:"followed"`
@@ -31,7 +32,7 @@ func GetInfo(username string) (info UserInfo, err utils.Err) {
 		return info, utils.NewErr(ErrNotFound)
 	}
 	info.ID = generateID(u.Username)
-	info.Username = u.Username
+	info.Nickname = u.Nickname
 	return info, nil
 }
 
@@ -42,7 +43,8 @@ func GetProfile(username string) (info UserProfile, err utils.Err) {
 	}
 	info.ID = generateID(u.Username)
 	info.Username = u.Username
-	info.Bio = u.Bio
+	info.Nickname = u.Nickname
+	info.Summary = u.Summary
 	if info.Follows, e = db.QueryUserFollows(username); e != nil {
 		// should not reach here now
 	}
@@ -64,6 +66,7 @@ func GetFollowings(username string) (list []*UserInfo, err utils.Err) {
 		list = append(list, &UserInfo{
 			ID:       generateID(u.Username),
 			Username: u.Username,
+			Nickname: u.Nickname,
 		})
 	}
 	return list, nil
@@ -79,6 +82,7 @@ func GetFollowers(username string) (list []*UserInfo, err utils.Err) {
 		list = append(list, &UserInfo{
 			ID:       generateID(u.Username),
 			Username: u.Username,
+			Nickname: u.Nickname,
 		})
 	}
 	return list, nil

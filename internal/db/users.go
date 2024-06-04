@@ -6,7 +6,8 @@ import (
 
 type User struct {
 	Username string
-	Bio      string
+	Nickname string
+	Summary  string
 }
 
 type follow struct {
@@ -20,19 +21,23 @@ var followsDb = make([]*follow, 0, 100)
 func initUserDb() {
 	infoDb["u1"] = &User{
 		Username: "u1",
-		Bio:      "i'm u1",
+		Nickname: "User1",
+		Summary:  "i'm u1",
 	}
 	infoDb["u2"] = &User{
 		Username: "u2",
-		Bio:      "i'm u2",
+		Nickname: "User2",
+		Summary:  "i'm u2",
 	}
 	infoDb["u3"] = &User{
 		Username: "u3",
-		Bio:      "i'm u3",
+		Nickname: "User3",
+		Summary:  "i'm u3",
 	}
 	infoDb["u4"] = &User{
 		Username: "u4",
-		Bio:      "i'm u4",
+		Nickname: "User4",
+		Summary:  "i'm u4",
 	}
 
 	SetFollow("u1", "u3")

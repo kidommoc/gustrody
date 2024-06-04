@@ -2,6 +2,7 @@ package posts
 
 import (
 	"fmt"
+	"time"
 	"unicode/utf8"
 
 	"github.com/kidommoc/gustrody/internal/db"
@@ -10,18 +11,13 @@ import (
 )
 
 // should load from .env
-var site = "localhost:8000"
 var maxContentLength = 1000
 
 type Post struct {
 	ID          string         `json:"id"`
 	User        users.UserInfo `json:"user"`
-	PublishedAt int64          `json:"publishedAt"`
+	PublishedAt string         `json:"publishedAt"`
 	Content     string         `json:"content"`
-}
-
-func generateID(id string) string {
-	return site + "/posts/" + id
 }
 
 func Get(postId string) (post Post, err utils.Err) {
@@ -42,9 +38,9 @@ func Get(postId string) (post Post, err utils.Err) {
 		}
 	}
 
-	post.ID = generateID(result.ID)
+	post.ID = result.ID
 	post.User = user
-	post.PublishedAt = result.Date // should generate from timestamp
+	post.PublishedAt = time.Unix(result.Date, 0).Format(time.RFC3339)
 	post.Content = result.Content
 	return post, nil
 }
@@ -69,9 +65,9 @@ func GetByUser(username string) (list []*Post, err utils.Err) {
 	for _, p := range result {
 		fmt.Println(*p)
 		post := new(Post)
-		post.ID = generateID(p.ID)
+		post.ID = p.ID
 		post.User = user
-		post.PublishedAt = p.Date // should generate from timestamp
+		post.PublishedAt = time.Unix(p.Date, 0).Format(time.RFC3339)
 		post.Content = p.Content
 		list = append(list, post)
 	}

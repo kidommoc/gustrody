@@ -17,6 +17,9 @@ type Post struct {
 
 var postDb = make(map[string]*Post)
 
+// should load from .env
+var site = "localhost:8000"
+
 func initPostDb() {
 	SetPost("u1", "1:u1u1u1u1")
 	time.Sleep(time.Second)
@@ -81,7 +84,7 @@ func QueryPostsByUser(user string, asec bool) (l []*Post, err utils.Err) {
 }
 
 func SetPost(user string, content string) utils.Err {
-	id := uuid.New().String()
+	id := site + "/posts/" + uuid.New().String()
 	date := time.Now()
 	p := &Post{
 		ID:      id,
