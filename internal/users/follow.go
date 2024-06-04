@@ -26,7 +26,7 @@ func Unfollow(actor string, target string) utils.Err {
 	if actor == target {
 		return utils.NewErr(ErrSelfFollow)
 	}
-	if err := db.UnsetFollow(actor, target); err != nil {
+	if err := db.RemoveFollow(actor, target); err != nil {
 		switch {
 		case err.Code() == db.ErrNotFound && err.Error() == "from":
 			return utils.NewErr(ErrNotFound, "from")

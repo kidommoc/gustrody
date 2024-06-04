@@ -5,7 +5,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-var site = "localhost:8000" // should load from .env
+var site = "127.0.0.1:8000" // should load from .env
 
 type UserInfo struct {
 	ID       string `json:"id"`
@@ -32,6 +32,7 @@ func GetInfo(username string) (info UserInfo, err utils.Err) {
 		return info, utils.NewErr(ErrNotFound)
 	}
 	info.ID = generateID(u.Username)
+	info.Username = u.Username
 	info.Nickname = u.Nickname
 	return info, nil
 }

@@ -1,6 +1,8 @@
 package db
 
 import (
+	"slices"
+
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
@@ -135,7 +137,7 @@ func SetFollow(from string, to string) utils.Err {
 	return nil
 }
 
-func UnsetFollow(from string, to string) utils.Err {
+func RemoveFollow(from string, to string) utils.Err {
 	if !checkUser(from) {
 		return utils.NewErr(ErrNotFound, "from")
 	}
@@ -143,8 +145,7 @@ func UnsetFollow(from string, to string) utils.Err {
 		return utils.NewErr(ErrNotFound, "to")
 	}
 	if index := checkFollow(from, to); index != -1 {
-		followsDb[index] = followsDb[len(followsDb)-1]
-		followsDb = followsDb[:len(followsDb)-1]
+		followsDb = slices.Delete(followsDb, index, index+1)
 	}
 	return nil
 }

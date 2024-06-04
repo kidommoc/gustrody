@@ -1,12 +1,14 @@
 package utils
 
+type ErrCode uint
+
 type Err interface {
-	Code() uint
+	Code() ErrCode
 	Error() string
 }
 
 type err struct {
-	code uint
+	code ErrCode
 	msg  string
 }
 
@@ -14,11 +16,11 @@ func (e err) Error() string {
 	return e.msg
 }
 
-func (e err) Code() uint {
+func (e err) Code() ErrCode {
 	return e.code
 }
 
-func NewErr(code uint, msg ...string) Err {
+func NewErr(code ErrCode, msg ...string) Err {
 	if len(msg) == 0 {
 		msg = []string{""}
 	}

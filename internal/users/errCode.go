@@ -1,4 +1,8 @@
 package users
 
-var ErrNotFound uint = 0
-var ErrSelfFollow uint = 1
+import "github.com/kidommoc/gustrody/internal/utils"
+
+const (
+	ErrNotFound utils.ErrCode = iota
+	ErrSelfFollow
+)

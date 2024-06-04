@@ -9,24 +9,26 @@ import (
 )
 
 func routePosts(router fiber.Router) {
-	router.Get("/:postId", getPost)
+	router.Get("/:postID", getPost)
+	router.Get("/:postID/likes", getPostLikes)
+	router.Get("/:postID/shares", getPostShares)
 	router.Put("/", mAuth, newPost)
-	router.Post("/:postId", mAuth, editPost)
-	router.Delete("/:postId", mAuth, removePost)
-	// router.Put("/:postId/like", mAuth, likePost)
-	// router.Delete("/:postId/like", mAuth, unlikePost)
-	// router.Put("/:postId/share", mAuth, sharePost)
-	// router.Delete("/:postId/share", mAuth, unsharePost)
+	router.Post("/:postID", mAuth, editPost)
+	router.Delete("/:postID", mAuth, removePost)
+	router.Put("/:postID/like", mAuth, likePost)
+	router.Delete("/:postID/like", mAuth, unlikePost)
+	router.Put("/:postID/share", mAuth, sharePost)
+	router.Delete("/:postID/share", mAuth, unsharePost)
 }
 
 func getPost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id.")
+		return c.SendString("Acquire post id.")
 	}
 
-	post, err := posts.Get(postId)
+	post, err := posts.Get(postID)
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
@@ -40,9 +42,55 @@ func getPost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]GET: request for %s\n", postId)
+	fmt.Printf("[POSTS]GET: request for %s\n", postID)
 	c.Status(fiber.StatusOK)
 	return c.JSON(post)
+}
+
+func getPostLikes(c *fiber.Ctx) error {
+	postID := c.Params("postID")
+	if postID == "" {
+		c.Status(fiber.StatusBadRequest)
+		return c.SendString("Acquire post id.")
+	}
+
+	list, err := posts.GetLikes(postID)
+	if err != nil {
+		switch err.Code() {
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]GET: request for likes of %s\n", postID)
+	c.Status(fiber.StatusOK)
+	return c.JSON(list)
+}
+
+func getPostShares(c *fiber.Ctx) error {
+	postID := c.Params("postID")
+	if postID == "" {
+		c.Status(fiber.StatusBadRequest)
+		return c.SendString("Acquire post id.")
+	}
+
+	list, err := posts.GetShares(postID)
+	if err != nil {
+		switch err.Code() {
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]GET: request for shares of %s\n", postID)
+	c.Status(fiber.StatusOK)
+	return c.JSON(list)
 }
 
 type contentBody struct {
@@ -57,7 +105,7 @@ func newPost(c *fiber.Ctx) error {
 	content := new(contentBody)
 	if err := c.BodyParser(content); err != nil {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire content to post.")
+		return c.SendString("Acquire content to post.")
 	}
 
 	if err := posts.New(strings.Clone(username), strings.Clone(content.Content)); err != nil {
@@ -69,10 +117,10 @@ func newPost(c *fiber.Ctx) error {
 			switch err.Error() {
 			case "empty":
 				c.Status(fiber.StatusBadRequest)
-				c.SendString("Acquire content to post.")
+				return c.SendString("Acquire content to post.")
 			case "long":
 				c.Status(fiber.StatusBadRequest)
-				c.SendString("Content is too long to post.")
+				return c.SendString("Content is too long to post.")
 			}
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
@@ -84,10 +132,10 @@ func newPost(c *fiber.Ctx) error {
 }
 
 func editPost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id.")
+		return c.SendString("Acquire post id.")
 	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
@@ -96,10 +144,10 @@ func editPost(c *fiber.Ctx) error {
 	content := new(contentBody)
 	if err := c.BodyParser(content); err != nil {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire content to post.")
+		return c.SendString("Acquire content to post.")
 	}
 
-	if err := posts.Edit(username, postId, strings.Clone(content.Content)); err != nil {
+	if err := posts.Edit(username, postID, strings.Clone(content.Content)); err != nil {
 		switch err.Code() {
 		case posts.ErrOwner:
 			c.Status(fiber.StatusForbidden)
@@ -111,32 +159,32 @@ func editPost(c *fiber.Ctx) error {
 			switch err.Error() {
 			case "empty":
 				c.Status(fiber.StatusBadRequest)
-				c.SendString("Acquire content to post.")
+				return c.SendString("Acquire content to post.")
 			case "long":
 				c.Status(fiber.StatusBadRequest)
-				c.SendString("Content is too long to post.")
+				return c.SendString("Content is too long to post.")
 			}
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
-	fmt.Printf("[POSTS]EDIT: %s edits %s\n", username, postId)
+	fmt.Printf("[POSTS]EDIT: %s edits %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func removePost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id")
+		return c.SendString("Acquire post id")
 	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Remove(username, postId); err != nil {
+	if err := posts.Remove(username, postID); err != nil {
 		switch err.Code() {
 		case posts.ErrOwner:
 			c.Status(fiber.StatusForbidden)
@@ -149,62 +197,112 @@ func removePost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]REMOVE: %s removes %s\n", username, postId)
+	fmt.Printf("[POSTS]REMOVE: %s removes %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func likePost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id.")
+		return c.SendString("Acquire post id.")
 	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	fmt.Printf("[POSTS]LIKE: %s likes %s\n", username, postId)
+
+	if err := posts.Like(username, postID); err != nil {
+		switch err.Code() {
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]LIKE: %s likes %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func unlikePost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id.")
+		return c.SendString("Acquire post id.")
 	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	fmt.Printf("[POSTS]UNLIKE: %s unlikes %s\n", username, postId)
+
+	if err := posts.Unlike(username, postID); err != nil {
+		switch err.Code() {
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		case posts.ErrLikeNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Like not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]UNLIKE: %s unlikes %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func sharePost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id.")
+		return c.SendString("Acquire post id.")
 	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	fmt.Printf("[POSTS]SHARE: %s shares %s\n", username, postId)
+
+	if err := posts.Share(username, postID); err != nil {
+		switch err.Code() {
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]SHARE: %s shares %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func unsharePost(c *fiber.Ctx) error {
-	postId := c.Params("postId")
-	if postId == "" {
+	postID := c.Params("postID")
+	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
-		c.SendString("Acquire post id.")
+		return c.SendString("Acquire post id.")
 	}
 	username, ok := c.Locals("username").(string)
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	fmt.Printf("[POSTS]UNSHARE: %s unshares %s\n", username, postId)
+
+	if err := posts.Unshare(username, postID); err != nil {
+		switch err.Code() {
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		case posts.ErrShareNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Share not found.")
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]UNSHARE: %s unshares %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
