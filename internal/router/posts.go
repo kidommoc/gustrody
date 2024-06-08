@@ -15,10 +15,12 @@ func routePosts(router fiber.Router) {
 	router.Put("/", mAuth, newPost)
 	router.Post("/:postID", mAuth, editPost)
 	router.Delete("/:postID", mAuth, removePost)
+
 	router.Put("/:postID/like", mAuth, likePost)
 	router.Delete("/:postID/like", mAuth, unlikePost)
 	router.Put("/:postID/share", mAuth, sharePost)
 	router.Delete("/:postID/share", mAuth, unsharePost)
+	router.Put("/:postID/reply", mAuth, replyPost)
 }
 
 func getPost(c *fiber.Ctx) error {
@@ -212,7 +214,7 @@ func likePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Like(username, postID); err != nil {
+	if err := posts.Like(strings.Clone(username), postID); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -265,7 +267,7 @@ func sharePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Share(username, postID); err != nil {
+	if err := posts.Share(strings.Clone(username), postID); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -304,5 +306,47 @@ func unsharePost(c *fiber.Ctx) error {
 	}
 
 	fmt.Printf("[POSTS]UNSHARE: %s unshares %s\n", username, postID)
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func replyPost(c *fiber.Ctx) error {
+	postID := c.Params("postID")
+	if postID == "" {
+		c.Status(fiber.StatusBadRequest)
+		return c.SendString("Acquire post id")
+	}
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		return c.SendStatus(fiber.StatusUnauthorized)
+	}
+	content := new(contentBody)
+	if err := c.BodyParser(content); err != nil {
+		c.Status(fiber.StatusBadRequest)
+		return c.SendString("Acquire content to post.")
+	}
+
+	if err := posts.Reply(strings.Clone(username), postID, strings.Clone(content.Content)); err != nil {
+		switch err.Code() {
+		case posts.ErrUserNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Actor(User) not found.")
+		case posts.ErrPostNotFound:
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("Post not found.")
+		case posts.ErrContent:
+			switch err.Error() {
+			case "empty":
+				c.Status(fiber.StatusBadRequest)
+				return c.SendString("Acquire content to post.")
+			case "long":
+				c.Status(fiber.StatusBadRequest)
+				return c.SendString("Content is too long to post.")
+			}
+		default:
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+	}
+
+	fmt.Printf("[POSTS]REPLY: %s replies %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }

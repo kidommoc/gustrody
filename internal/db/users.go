@@ -48,7 +48,7 @@ func initUserDb() {
 	SetFollow("u3", "u2")
 }
 
-func checkUser(username string) bool {
+func IsUserExist(username string) bool {
 	if infoDb[username] != nil {
 		return true
 	} else {
@@ -65,15 +65,15 @@ func checkFollow(from string, to string) int {
 	return -1
 }
 
-func QueryUser(username string) (user *User, err utils.Err) {
-	if !checkUser(username) {
+func QueryUser(username string) (user User, err utils.Err) {
+	if !IsUserExist(username) {
 		return user, utils.NewErr(ErrNotFound, "user")
 	}
-	return infoDb[username], nil
+	return *infoDb[username], nil
 }
 
 func QueryUserFollows(username string) (count uint, err utils.Err) {
-	if !checkUser(username) {
+	if !IsUserExist(username) {
 		return 0, utils.NewErr(ErrNotFound, "user")
 	}
 	count = 0
@@ -86,7 +86,7 @@ func QueryUserFollows(username string) (count uint, err utils.Err) {
 }
 
 func QueryUserFollowed(username string) (count uint, err utils.Err) {
-	if !checkUser(username) {
+	if !IsUserExist(username) {
 		return 0, utils.NewErr(ErrNotFound, "user")
 	}
 	count = 0
@@ -100,7 +100,7 @@ func QueryUserFollowed(username string) (count uint, err utils.Err) {
 
 func QueryUserFollowings(username string) (list []*User, err utils.Err) {
 	list = make([]*User, 0)
-	if !checkUser(username) {
+	if !IsUserExist(username) {
 		return list, utils.NewErr(ErrNotFound, "user")
 	}
 	for _, f := range followsDb {
@@ -113,7 +113,7 @@ func QueryUserFollowings(username string) (list []*User, err utils.Err) {
 
 func QueryUserFollowers(username string) (list []*User, err utils.Err) {
 	list = make([]*User, 0)
-	if !checkUser(username) {
+	if !IsUserExist(username) {
 		return list, utils.NewErr(ErrNotFound, "user")
 	}
 	for _, f := range followsDb {
@@ -125,10 +125,10 @@ func QueryUserFollowers(username string) (list []*User, err utils.Err) {
 }
 
 func SetFollow(from string, to string) utils.Err {
-	if !checkUser(from) {
+	if !IsUserExist(from) {
 		return utils.NewErr(ErrNotFound, "from")
 	}
-	if !checkUser(to) {
+	if !IsUserExist(to) {
 		return utils.NewErr(ErrNotFound, "to")
 	}
 	if index := checkFollow(from, to); index == -1 {
@@ -138,10 +138,10 @@ func SetFollow(from string, to string) utils.Err {
 }
 
 func RemoveFollow(from string, to string) utils.Err {
-	if !checkUser(from) {
+	if !IsUserExist(from) {
 		return utils.NewErr(ErrNotFound, "from")
 	}
-	if !checkUser(to) {
+	if !IsUserExist(to) {
 		return utils.NewErr(ErrNotFound, "to")
 	}
 	if index := checkFollow(from, to); index != -1 {

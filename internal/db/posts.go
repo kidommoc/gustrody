@@ -10,14 +10,14 @@ import (
 )
 
 type Post struct {
-	ID      string
-	User    string
-	Date    int64
-	Content string
-	ReplyTo string
-	Replies []string
-	Likes   []string
-	Shares  []string
+	ID       string   `json:"id"`
+	User     string   `json:"user"`
+	Date     int64    `json:"date"`
+	Content  string   `json:"content"`
+	Replying string   `json:"replying"` // post id
+	Likes    []string `json:"likes"`    // user id
+	Shares   []string `json:"shares"`   // user id
+	Level    int      `json:"level"`    // temporary field, used in replying and replies
 }
 
 type Share struct {
@@ -34,27 +34,22 @@ func initPostDb() {
 	id := func() string {
 		return site + "/posts/" + uuid.New().String()
 	}
-	SetPost(id(), "u1", "1:u1u1u1u1")
-	time.Sleep(time.Second)
 	tmp1 := id()
-	SetPost(tmp1, "u2", "1:u2u2u2u2")
-	time.Sleep(time.Second)
-	SetShare("u1", tmp1)
-	time.Sleep(time.Second)
-	SetPost(id(), "u1", "2:u1u1u1u1")
+	SetPost(tmp1, "u1", "p:u1-1")
 	time.Sleep(time.Second)
 	tmp2 := id()
-	SetPost(tmp2, "u3", "1:u3u3u3u3")
+	SetPost(tmp2, "u2", "p:u2-1")
 	time.Sleep(time.Second)
 	SetShare("u1", tmp2)
-}
-
-func checkPost(id string) bool {
-	if postDb[id] != nil {
-		return true
-	} else {
-		return false
-	}
+	time.Sleep(time.Second)
+	SetPost(id(), "u1", "p:u1-2")
+	time.Sleep(time.Second)
+	SetPost(id(), "u3", "p:u3-1")
+	time.Sleep(time.Second)
+	tmp4 := id()
+	SetReply("u2", tmp4, tmp1, "r:u1-1")
+	time.Sleep(time.Second)
+	SetReply("u1", id(), tmp4, "r:u2-u1-1")
 }
 
 func checkPostOwner(id string, user string) bool {
@@ -65,16 +60,76 @@ func checkPostOwner(id string, user string) bool {
 	}
 }
 
-func now() string {
-	return time.Now().Format(time.RFC822)
+func now() int64 {
+	return time.Now().Unix()
 }
 
-func QueryPostByID(id string) (post *Post, err utils.Err) {
-	if postDb[id] == nil {
-		return nil, utils.NewErr(ErrNotFound, "post")
+func IsPostExsit(id string) bool {
+	if postDb[id] != nil {
+		return true
+	} else {
+		return false
 	}
-	p := *postDb[id]
-	return &p, nil
+}
+
+func QueryPostByID(id string) (post Post, err utils.Err) {
+	if !IsPostExsit(id) {
+		return post, utils.NewErr(ErrNotFound, "post")
+	}
+	return *postDb[id], nil
+}
+
+func QueryPostReplies(id string) (replyings []*Post, replies []*Post, err utils.Err) {
+	if !IsPostExsit(id) {
+		return nil, nil, utils.NewErr(ErrNotFound, "post")
+	}
+	p := postDb[id]
+
+	replyings = make([]*Post, 0)
+	r := postDb[p.Replying]
+	lev := 1
+	for r != nil {
+		p := *r
+		p.Level = lev
+		lev += 1
+		replyings = append(replyings, &p)
+		r = postDb[r.Replying]
+	}
+
+	replies = make([]*Post, 0)
+	working := make(map[string]*Post)
+	next := make(map[string]*Post)
+	working[id] = postDb[id]
+	lev = 1
+	for len(working) > 0 {
+		for _, v := range postDb {
+			if working[v.Replying] != nil {
+				p := *v
+				p.Level = lev
+				next[v.ID] = &p
+				replies = append(replies, &p)
+			}
+		}
+		working = next
+		next = make(map[string]*Post)
+		lev += 1
+	}
+
+	sort.Slice(replyings, func(i, j int) bool {
+		if replyings[i].Level < replyings[j].Level {
+			return true
+		} else {
+			return false
+		}
+	})
+	sort.Slice(replies, func(i, j int) bool {
+		if replies[i].Level < replies[j].Level {
+			return true
+		} else {
+			return false
+		}
+	})
+	return replyings, replies, nil
 }
 
 func QueryPostsByUser(user string, asec bool) (l []*Post, err utils.Err) {
@@ -114,40 +169,48 @@ func QuerySharesByUser(user string, asec bool) (l []*Share, err utils.Err) {
 }
 
 func SetPost(id string, user string, content string) utils.Err {
+	if IsPostExsit(id) {
+		return utils.NewErr(ErrDunplicate, "post")
+	}
+
 	p := &Post{
 		ID:      id,
 		User:    user,
-		Date:    time.Now().Unix(),
+		Date:    now(),
 		Content: content,
+		Likes:   make([]string, 0),
+		Shares:  make([]string, 0),
 	}
 	postDb[id] = p
 	return nil
 }
 
 func UpdatePost(id string, content string) utils.Err {
-	p := postDb[id]
-	if p == nil {
+	if !IsPostExsit(id) {
 		return utils.NewErr(ErrNotFound, "post")
 	}
+
+	p := postDb[id]
 	p.Content = content
-	p.Date = time.Now().Unix()
+	p.Date = now()
 	return nil
 }
 
 func RemovePost(id string) utils.Err {
-	p := postDb[id]
-	if p == nil {
+	if !IsPostExsit(id) {
 		return utils.NewErr(ErrNotFound, "post")
 	}
+
 	delete(postDb, id)
 	return nil
 }
 
 func SetLike(user string, id string) utils.Err {
-	p := postDb[id]
-	if p == nil {
+	if !IsPostExsit(id) {
 		return utils.NewErr(ErrNotFound, "post")
 	}
+
+	p := postDb[id]
 	for _, v := range p.Likes {
 		if v == user {
 			return nil
@@ -158,10 +221,11 @@ func SetLike(user string, id string) utils.Err {
 }
 
 func RemoveLike(user string, id string) utils.Err {
-	p := postDb[id]
-	if p == nil {
+	if !IsPostExsit(id) {
 		return utils.NewErr(ErrNotFound, "post")
 	}
+
+	p := postDb[id]
 	for i, v := range p.Likes {
 		if v == user {
 			p.Likes = slices.Delete(p.Likes, i, i+1)
@@ -172,10 +236,11 @@ func RemoveLike(user string, id string) utils.Err {
 }
 
 func SetShare(user string, id string) utils.Err {
-	p := postDb[id]
-	if p == nil {
+	if !IsPostExsit(id) {
 		return utils.NewErr(ErrNotFound, "post")
 	}
+
+	p := postDb[id]
 	for _, v := range p.Shares {
 		if v == user {
 			return nil
@@ -185,16 +250,16 @@ func SetShare(user string, id string) utils.Err {
 	shareDb = append(shareDb, &Share{
 		ID:   id,
 		User: user,
-		Date: time.Now().Unix(),
+		Date: now(),
 	})
 	return nil
 }
 
 func RemoveShare(user string, id string) utils.Err {
-	p := postDb[id]
-	if p == nil {
+	if !IsPostExsit(id) {
 		return utils.NewErr(ErrNotFound, "post")
 	}
+	p := postDb[id]
 
 	// use 2 annoymous func to ensure completely deletion
 
@@ -223,4 +288,25 @@ func RemoveShare(user string, id string) utils.Err {
 	} else {
 		return nil
 	}
+}
+
+func SetReply(user string, id string, replying string, content string) utils.Err {
+	if IsPostExsit(id) {
+		return utils.NewErr(ErrDunplicate, "post")
+	}
+	if !IsPostExsit(replying) {
+		return utils.NewErr(ErrNotFound, "post")
+	}
+
+	r := &Post{
+		ID:       id,
+		User:     user,
+		Date:     now(),
+		Content:  content,
+		Replying: replying,
+		Likes:    make([]string, 0),
+		Shares:   make([]string, 0),
+	}
+	postDb[id] = r
+	return nil
 }

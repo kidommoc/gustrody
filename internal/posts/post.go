@@ -22,6 +22,8 @@ type Post struct {
 	Content     string          `json:"content"`
 	Likes       int             `json:"likes"`
 	Shares      int             `json:"shares"`
+	Replyings   []*Post         `json:"replyings,omitempty"`
+	Replies     []*Post         `json:"replies,omitempty"`
 }
 
 func newID() string {
@@ -30,6 +32,24 @@ func newID() string {
 
 func fullID(id string) string {
 	return site + "/posts/" + id
+}
+
+func makePost(p *db.Post) (post Post, err utils.Err) {
+	u, e := users.GetInfo(p.User)
+	if e != nil {
+		return post, utils.NewErr(ErrUserNotFound)
+	}
+
+	post = Post{
+		ID:          p.ID,
+		User:        &u,
+		PublishedAt: time.Unix(p.Date, 0).Format(time.RFC3339),
+		Content:     p.Content,
+		Likes:       len(p.Likes),
+		Shares:      len(p.Shares),
+	}
+
+	return post, nil
 }
 
 func Get(postID string) (post Post, err utils.Err) {
@@ -41,7 +61,8 @@ func Get(postID string) (post Post, err utils.Err) {
 			// default:
 		}
 	}
-	user, e := users.GetInfo(result.User)
+
+	post, e = makePost(&result)
 	if e != nil {
 		switch {
 		case e.Code() == db.ErrNotFound && e.Error() == "user":
@@ -49,13 +70,8 @@ func Get(postID string) (post Post, err utils.Err) {
 			// default:
 		}
 	}
+	setReplies(&post)
 
-	post.ID = result.ID
-	post.User = &user
-	post.PublishedAt = time.Unix(result.Date, 0).Format(time.RFC3339)
-	post.Content = result.Content
-	post.Likes = len(result.Likes)
-	post.Shares = len(result.Shares)
 	return post, nil
 }
 
@@ -76,6 +92,7 @@ func GetLikes(postID string) (list []*users.UserInfo, err utils.Err) {
 			list = append(list, &info)
 		}
 	}
+
 	return list, nil
 }
 
@@ -96,6 +113,7 @@ func GetShares(postID string) (list []*users.UserInfo, err utils.Err) {
 			list = append(list, &info)
 		}
 	}
+
 	return list, nil
 }
 
@@ -108,15 +126,17 @@ func GetByUser(username string) (list []*Post, err utils.Err) {
 			// default:
 		}
 	}
+
 	posts, _ := db.QueryPostsByUser(username, true) // ascending by date
 	shares, _ := db.QuerySharesByUser(username, true)
 	iP := len(posts) - 1 // start from end (newest)
 	iS := len(shares) - 1
 
 	for iP >= 0 || iS >= 0 {
-		post := new(Post)
 		var p *db.Post
 		var flag bool // true: post, false: share
+		var actor *users.UserInfo
+		var sharedBy *users.UserInfo
 
 		if iP < 0 {
 			flag = false
@@ -132,39 +152,36 @@ func GetByUser(username string) (list []*Post, err utils.Err) {
 
 		if flag {
 			p = posts[iP]
-			post.User = &user
-			post.SharedBy = nil
+			actor = &user
+			sharedBy = nil
 			iP = iP - 1
 		} else {
-			p, e = db.QueryPostByID(shares[iS].ID)
+			shared, e := db.QueryPostByID(shares[iS].ID)
 			if e != nil {
 				continue
 			}
+			p = &shared
 			u, e := users.GetInfo(p.User)
 			if e != nil {
 				continue
 			}
-			post.User = &u
-			post.SharedBy = &user
+			actor = &u
+			sharedBy = &user
 			iS = iS - 1
 		}
 
-		post.ID = p.ID
-		post.PublishedAt = time.Unix(p.Date, 0).Format(time.RFC3339)
-		post.Content = p.Content
-		post.Likes = len(p.Likes)
-		post.Shares = len(p.Shares)
-		list = append(list, post)
+		post, _ := makePost(p)
+		post.User = actor
+		post.SharedBy = sharedBy
+		list = append(list, &post)
 	}
+
 	return list, nil
 }
 
 func New(username string, content string) utils.Err {
-	if _, e := db.QueryUser(username); e != nil {
-		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "user":
-			return utils.NewErr(ErrUserNotFound)
-		}
+	if !db.IsUserExist(username) {
+		return utils.NewErr(ErrUserNotFound)
 	}
 	if content == "" {
 		return utils.NewErr(ErrContent, "empty")
@@ -172,11 +189,14 @@ func New(username string, content string) utils.Err {
 	if utf8.RuneCountInString(content) > maxContentLength {
 		return utils.NewErr(ErrContent, "long")
 	}
-	if e := db.SetPost(newID(), username, content); e != nil {
-		switch {
-		// default:
-		}
+
+	id := newID()
+	for db.IsPostExsit(id) {
+		id = newID()
 	}
+	// note: should not return any error here
+	db.SetPost(id, username, content)
+
 	return nil
 }
 
@@ -187,6 +207,7 @@ func Edit(username string, postID string, content string) utils.Err {
 	if utf8.RuneCountInString(content) > maxContentLength {
 		return utils.NewErr(ErrContent, "too long")
 	}
+
 	post, e := db.QueryPostByID(fullID(postID))
 	if e != nil {
 		switch {
@@ -198,11 +219,13 @@ func Edit(username string, postID string, content string) utils.Err {
 	if post.User != username {
 		return utils.NewErr(ErrOwner)
 	}
+
 	if e := db.UpdatePost(fullID(postID), content); e != nil {
 		switch {
 		// default:
 		}
 	}
+
 	return nil
 }
 
@@ -218,10 +241,12 @@ func Remove(username string, postID string) utils.Err {
 	if post.User != username {
 		return utils.NewErr(ErrOwner)
 	}
+
 	if e := db.RemovePost(fullID(postID)); e != nil {
 		switch {
 		// default:
 		}
 	}
+
 	return nil
 }
