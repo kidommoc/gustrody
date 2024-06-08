@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/posts"
+	"github.com/kidommoc/gustrody/internal/users"
 )
 
 func routePosts(router fiber.Router) {
@@ -30,7 +32,9 @@ func getPost(c *fiber.Ctx) error {
 		return c.SendString("Acquire post id.")
 	}
 
-	post, err := posts.Get(postID)
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	post, err := postService.Get(postID)
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
@@ -56,7 +60,9 @@ func getPostLikes(c *fiber.Ctx) error {
 		return c.SendString("Acquire post id.")
 	}
 
-	list, err := posts.GetLikes(postID)
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	list, err := postService.GetLikes(postID)
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
@@ -79,7 +85,9 @@ func getPostShares(c *fiber.Ctx) error {
 		return c.SendString("Acquire post id.")
 	}
 
-	list, err := posts.GetShares(postID)
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	list, err := postService.GetShares(postID)
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
@@ -110,7 +118,9 @@ func newPost(c *fiber.Ctx) error {
 		return c.SendString("Acquire content to post.")
 	}
 
-	if err := posts.New(strings.Clone(username), strings.Clone(content.Content)); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.New(strings.Clone(username), strings.Clone(content.Content)); err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -149,7 +159,9 @@ func editPost(c *fiber.Ctx) error {
 		return c.SendString("Acquire content to post.")
 	}
 
-	if err := posts.Edit(username, postID, strings.Clone(content.Content)); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Edit(username, postID, strings.Clone(content.Content)); err != nil {
 		switch err.Code() {
 		case posts.ErrOwner:
 			c.Status(fiber.StatusForbidden)
@@ -186,7 +198,9 @@ func removePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Remove(username, postID); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Remove(username, postID); err != nil {
 		switch err.Code() {
 		case posts.ErrOwner:
 			c.Status(fiber.StatusForbidden)
@@ -214,7 +228,9 @@ func likePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Like(strings.Clone(username), postID); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Like(strings.Clone(username), postID); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -239,7 +255,9 @@ func unlikePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Unlike(username, postID); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Unlike(username, postID); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -267,7 +285,9 @@ func sharePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Share(strings.Clone(username), postID); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Share(strings.Clone(username), postID); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -292,7 +312,9 @@ func unsharePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if err := posts.Unshare(username, postID); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Unshare(username, postID); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -325,7 +347,9 @@ func replyPost(c *fiber.Ctx) error {
 		return c.SendString("Acquire content to post.")
 	}
 
-	if err := posts.Reply(strings.Clone(username), postID, strings.Clone(content.Content)); err != nil {
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	if err := postService.Reply(strings.Clone(username), postID, strings.Clone(content.Content)); err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:
 			c.Status(fiber.StatusNotFound)

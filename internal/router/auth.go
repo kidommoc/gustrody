@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/kidommoc/gustrody/internal/auth"
+	"github.com/kidommoc/gustrody/internal/database"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -29,7 +30,10 @@ func mAuth(c *fiber.Ctx) error {
 		c.Status(fiber.StatusUnauthorized)
 		return c.SendString("Invalid header: Authorization.\nShould be Bearer token in JWT.")
 	}
-	username, err := auth.VerifyToken(bearer[1], session)
+
+	db := database.AuthInstance()
+	authService := auth.NewService(db)
+	username, err := authService.VerifyToken(bearer[1], session)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
 		switch err.Code() {
@@ -64,7 +68,9 @@ func login(c *fiber.Ctx) error {
 	}
 	fmt.Printf("[AUTH]LOGIN: username \"%s\", password \"%s\"\n", body.Username, body.Password)
 
-	session, oauth, err := auth.Login(body.Username, body.Password)
+	db := database.AuthInstance()
+	authService := auth.NewService(db)
+	session, oauth, err := authService.Login(body.Username, body.Password)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
 		switch err.Code() {

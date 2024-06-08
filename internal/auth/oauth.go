@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kidommoc/gustrody/internal/db"
+	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
+
+// token and session
 
 const TOKEN_EXPIRE = 5             // 5 hours
 const REFRESH_EXPIRE = 5 * 24 * 14 // 14 days
@@ -48,7 +50,19 @@ func generateToken(u string, s string, exp uint) string {
 	return signed
 }
 
-func VerifyToken(token string, session string) (username string, err utils.Err) {
+// oauth service
+
+type OauthService struct {
+	db database.IAuthDb
+}
+
+func NewService(db database.IAuthDb) *OauthService {
+	return &OauthService{
+		db: db,
+	}
+}
+
+func (service *OauthService) VerifyToken(token string, session string) (username string, err utils.Err) {
 	parsed, e := jwt.Parse(token, func(tok *jwt.Token) (interface{}, error) {
 		if _, ok := tok.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("jwt method error")
@@ -80,8 +94,8 @@ func VerifyToken(token string, session string) (username string, err utils.Err) 
 	return username, nil
 }
 
-func Login(username string, password string) (session string, oauth OauthToken, err utils.Err) {
-	p, err := db.QueryPasswordOfUser(username)
+func (service *OauthService) Login(username string, password string) (session string, oauth OauthToken, err utils.Err) {
+	p, err := service.db.QueryPasswordOfUser(username)
 	if err != nil {
 		return "", oauth, utils.NewErr(ErrUserNotFound)
 	}
@@ -89,13 +103,13 @@ func Login(username string, password string) (session string, oauth OauthToken, 
 		return "", oauth, utils.NewErr(ErrWrongPassword)
 	}
 	session = generateSession()
-	db.SetSession(session, username)
+	service.db.SetSession(session, username)
 	return session, *NewOauth(username, session), nil
 }
 
-func RefreshToken(session string, refresh string) (oauth OauthToken, err utils.Err) {
+func (service *OauthService) RefreshToken(session string, refresh string) (oauth OauthToken, err utils.Err) {
 	/* validate */
-	username, err := VerifyToken(refresh, session)
+	username, err := service.VerifyToken(refresh, session)
 	if err != nil {
 		return oauth, err
 	}

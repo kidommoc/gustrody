@@ -3,12 +3,12 @@ package posts
 import (
 	"unicode/utf8"
 
-	"github.com/kidommoc/gustrody/internal/db"
+	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func Reply(username string, postID string, content string) utils.Err {
-	if !db.IsUserExist(username) {
+func (service *PostService) Reply(username string, postID string, content string) utils.Err {
+	if !service.user.IsUserExist(username) {
 		return utils.NewErr(ErrUserNotFound)
 	}
 	if content == "" {
@@ -19,12 +19,12 @@ func Reply(username string, postID string, content string) utils.Err {
 	}
 
 	id := newID()
-	for db.IsPostExsit(id) {
+	for service.db.IsPostExist(id) {
 		id = newID()
 	}
-	if e := db.SetReply(username, id, fullID(postID), content); e != nil {
+	if e := service.db.SetReply(username, id, fullID(postID), content); e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "post":
+		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return utils.NewErr(ErrPostNotFound)
 			// default:
 		}
@@ -34,15 +34,15 @@ func Reply(username string, postID string, content string) utils.Err {
 }
 
 // set replyings and replies of a post
-func setReplies(p *Post) utils.Err {
-	rt, rs, e := db.QueryPostReplies(p.ID)
+func (service *PostService) setReplies(p *Post) utils.Err {
+	rt, rs, e := service.db.QueryPostReplies(p.ID)
 	if e != nil {
 		return utils.NewErr(ErrPostNotFound)
 	}
 
 	// replying to. as (linked) list
 	for _, v := range rt {
-		p, e := makePost(v)
+		p, e := service.makePost(v)
 		if e != nil {
 			continue // ?
 		}
@@ -62,7 +62,7 @@ func setReplies(p *Post) utils.Err {
 	for lev <= maxLev {
 		m2 := make(map[string]*Post)
 		for ; i < lrs && rs[i].Level == lev; i += 1 {
-			p, e := makePost(rs[i])
+			p, e := service.makePost(rs[i])
 			if e != nil {
 				continue // ?
 			}

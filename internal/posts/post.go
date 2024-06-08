@@ -4,38 +4,13 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
-	"github.com/kidommoc/gustrody/internal/db"
+	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/users"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-// should load from .env
-var maxContentLength = 1000
-var site = "127.0.0.1:8000"
-
-type Post struct {
-	ID          string          `json:"id"`
-	User        *users.UserInfo `json:"user"`
-	SharedBy    *users.UserInfo `json:"sharedBy,omitempty"`
-	PublishedAt string          `json:"publishedAt"`
-	Content     string          `json:"content"`
-	Likes       int             `json:"likes"`
-	Shares      int             `json:"shares"`
-	Replyings   []*Post         `json:"replyings,omitempty"`
-	Replies     []*Post         `json:"replies,omitempty"`
-}
-
-func newID() string {
-	return site + "/posts/" + uuid.New().String()
-}
-
-func fullID(id string) string {
-	return site + "/posts/" + id
-}
-
-func makePost(p *db.Post) (post Post, err utils.Err) {
-	u, e := users.GetInfo(p.User)
+func (service *PostService) makePost(p *database.Post) (post Post, err utils.Err) {
+	u, e := service.user.GetInfo(p.User)
 	if e != nil {
 		return post, utils.NewErr(ErrUserNotFound)
 	}
@@ -52,34 +27,34 @@ func makePost(p *db.Post) (post Post, err utils.Err) {
 	return post, nil
 }
 
-func Get(postID string) (post Post, err utils.Err) {
-	result, e := db.QueryPostByID(fullID(postID))
+func (service *PostService) Get(postID string) (post Post, err utils.Err) {
+	result, e := service.db.QueryPostByID(fullID(postID))
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "post":
+		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return post, utils.NewErr(ErrPostNotFound)
 			// default:
 		}
 	}
 
-	post, e = makePost(&result)
+	post, e = service.makePost(&result)
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "user":
+		case e.Code() == database.ErrNotFound && e.Error() == "user":
 			return post, utils.NewErr(ErrOwner)
 			// default:
 		}
 	}
-	setReplies(&post)
+	service.setReplies(&post)
 
 	return post, nil
 }
 
-func GetLikes(postID string) (list []*users.UserInfo, err utils.Err) {
-	result, e := db.QueryPostByID(fullID(postID))
+func (service *PostService) GetLikes(postID string) (list []*users.UserInfo, err utils.Err) {
+	result, e := service.db.QueryPostByID(fullID(postID))
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "post":
+		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return list, utils.NewErr(ErrPostNotFound)
 			// default:
 		}
@@ -87,7 +62,7 @@ func GetLikes(postID string) (list []*users.UserInfo, err utils.Err) {
 
 	list = make([]*users.UserInfo, 0, len(result.Likes))
 	for _, u := range result.Likes {
-		info, e := users.GetInfo(u)
+		info, e := service.user.GetInfo(u)
 		if e == nil {
 			list = append(list, &info)
 		}
@@ -96,11 +71,11 @@ func GetLikes(postID string) (list []*users.UserInfo, err utils.Err) {
 	return list, nil
 }
 
-func GetShares(postID string) (list []*users.UserInfo, err utils.Err) {
-	result, e := db.QueryPostByID(fullID(postID))
+func (service *PostService) GetShares(postID string) (list []*users.UserInfo, err utils.Err) {
+	result, e := service.db.QueryPostByID(fullID(postID))
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "post":
+		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return list, utils.NewErr(ErrPostNotFound)
 			// default:
 		}
@@ -108,7 +83,7 @@ func GetShares(postID string) (list []*users.UserInfo, err utils.Err) {
 
 	list = make([]*users.UserInfo, 0, len(result.Shares))
 	for _, u := range result.Shares {
-		info, e := users.GetInfo(u)
+		info, e := service.user.GetInfo(u)
 		if e == nil {
 			list = append(list, &info)
 		}
@@ -117,23 +92,23 @@ func GetShares(postID string) (list []*users.UserInfo, err utils.Err) {
 	return list, nil
 }
 
-func GetByUser(username string) (list []*Post, err utils.Err) {
-	user, e := users.GetInfo(username)
+func (service *PostService) GetByUser(username string) (list []*Post, err utils.Err) {
+	user, e := service.user.GetInfo(username)
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "user":
+		case e.Code() == database.ErrNotFound && e.Error() == "user":
 			return list, utils.NewErr(ErrUserNotFound)
 			// default:
 		}
 	}
 
-	posts, _ := db.QueryPostsByUser(username, true) // ascending by date
-	shares, _ := db.QuerySharesByUser(username, true)
+	posts, _ := service.db.QueryPostsByUser(username, true) // ascending by date
+	shares, _ := service.db.QuerySharesByUser(username, true)
 	iP := len(posts) - 1 // start from end (newest)
 	iS := len(shares) - 1
 
 	for iP >= 0 || iS >= 0 {
-		var p *db.Post
+		var p *database.Post
 		var flag bool // true: post, false: share
 		var actor *users.UserInfo
 		var sharedBy *users.UserInfo
@@ -156,12 +131,12 @@ func GetByUser(username string) (list []*Post, err utils.Err) {
 			sharedBy = nil
 			iP = iP - 1
 		} else {
-			shared, e := db.QueryPostByID(shares[iS].ID)
+			shared, e := service.db.QueryPostByID(shares[iS].ID)
 			if e != nil {
 				continue
 			}
 			p = &shared
-			u, e := users.GetInfo(p.User)
+			u, e := service.user.GetInfo(p.User)
 			if e != nil {
 				continue
 			}
@@ -170,7 +145,7 @@ func GetByUser(username string) (list []*Post, err utils.Err) {
 			iS = iS - 1
 		}
 
-		post, _ := makePost(p)
+		post, _ := service.makePost(p)
 		post.User = actor
 		post.SharedBy = sharedBy
 		list = append(list, &post)
@@ -179,8 +154,8 @@ func GetByUser(username string) (list []*Post, err utils.Err) {
 	return list, nil
 }
 
-func New(username string, content string) utils.Err {
-	if !db.IsUserExist(username) {
+func (service *PostService) New(username string, content string) utils.Err {
+	if !service.user.IsUserExist(username) {
 		return utils.NewErr(ErrUserNotFound)
 	}
 	if content == "" {
@@ -191,16 +166,16 @@ func New(username string, content string) utils.Err {
 	}
 
 	id := newID()
-	for db.IsPostExsit(id) {
+	for service.db.IsPostExist(id) {
 		id = newID()
 	}
 	// note: should not return any error here
-	db.SetPost(id, username, content)
+	service.db.SetPost(id, username, content)
 
 	return nil
 }
 
-func Edit(username string, postID string, content string) utils.Err {
+func (service *PostService) Edit(username string, postID string, content string) utils.Err {
 	if content == "" {
 		return utils.NewErr(ErrContent, "empty")
 	}
@@ -208,10 +183,10 @@ func Edit(username string, postID string, content string) utils.Err {
 		return utils.NewErr(ErrContent, "too long")
 	}
 
-	post, e := db.QueryPostByID(fullID(postID))
+	post, e := service.db.QueryPostByID(fullID(postID))
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "post":
+		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return utils.NewErr(ErrPostNotFound)
 			// default:
 		}
@@ -220,7 +195,7 @@ func Edit(username string, postID string, content string) utils.Err {
 		return utils.NewErr(ErrOwner)
 	}
 
-	if e := db.UpdatePost(fullID(postID), content); e != nil {
+	if e := service.db.UpdatePost(fullID(postID), content); e != nil {
 		switch {
 		// default:
 		}
@@ -229,11 +204,11 @@ func Edit(username string, postID string, content string) utils.Err {
 	return nil
 }
 
-func Remove(username string, postID string) utils.Err {
-	post, e := db.QueryPostByID(fullID(postID))
+func (service *PostService) Remove(username string, postID string) utils.Err {
+	post, e := service.db.QueryPostByID(fullID(postID))
 	if e != nil {
 		switch {
-		case e.Code() == db.ErrNotFound && e.Error() == "post":
+		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return utils.NewErr(ErrPostNotFound)
 			// default:
 		}
@@ -242,7 +217,7 @@ func Remove(username string, postID string) utils.Err {
 		return utils.NewErr(ErrOwner)
 	}
 
-	if e := db.RemovePost(fullID(postID)); e != nil {
+	if e := service.db.RemovePost(fullID(postID)); e != nil {
 		switch {
 		// default:
 		}

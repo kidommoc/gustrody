@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/posts"
 	"github.com/kidommoc/gustrody/internal/users"
 )
@@ -24,7 +25,9 @@ func getUserProfile(c *fiber.Ctx) error {
 		c.Status(fiber.StatusBadRequest)
 		c.SendString("Acquire username")
 	}
-	profile, err := users.GetProfile(username)
+
+	userService := users.NewService(database.UserInstance())
+	profile, err := userService.GetProfile(username)
 	if err != nil {
 		switch err.Code() {
 		case users.ErrNotFound:
@@ -47,7 +50,9 @@ func getUserPosts(c *fiber.Ctx) error {
 		c.SendString("Acquire username")
 	}
 
-	list, err := posts.GetByUser(username)
+	userService := users.NewService(database.UserInstance())
+	postService := posts.NewService(database.PostInstance(), userService)
+	list, err := postService.GetByUser(username)
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:
@@ -69,7 +74,9 @@ func getUserFollowings(c *fiber.Ctx) error {
 		c.Status(fiber.StatusBadRequest)
 		c.SendString("Acquire username")
 	}
-	list, err := users.GetFollowings(username)
+
+	userService := users.NewService(database.UserInstance())
+	list, err := userService.GetFollowings(username)
 	if err != nil {
 		switch err.Code() {
 		case users.ErrNotFound:
@@ -93,7 +100,9 @@ func getUserFollowers(c *fiber.Ctx) error {
 		c.Status(fiber.StatusBadRequest)
 		c.SendString("Acquire username")
 	}
-	list, err := users.GetFollowers(username)
+
+	userService := users.NewService(database.UserInstance())
+	list, err := userService.GetFollowers(username)
 	if err != nil {
 		switch err.Code() {
 		case users.ErrNotFound:
@@ -121,7 +130,9 @@ func follow(c *fiber.Ctx) error {
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	err := users.Follow(strings.Clone(username), strings.Clone(target))
+
+	userService := users.NewService(database.UserInstance())
+	err := userService.Follow(strings.Clone(username), strings.Clone(target))
 	if err != nil {
 		switch err.Code() {
 		case users.ErrSelfFollow:
@@ -149,7 +160,9 @@ func unfollow(c *fiber.Ctx) error {
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	err := users.Unfollow(strings.Clone(username), strings.Clone(target))
+
+	userService := users.NewService(database.UserInstance())
+	err := userService.Unfollow(strings.Clone(username), strings.Clone(target))
 	if err != nil {
 		switch err.Code() {
 		case users.ErrSelfFollow:

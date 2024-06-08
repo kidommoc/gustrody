@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/kidommoc/gustrody/internal/db"
+	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/router"
 
 	"fmt"
@@ -11,7 +11,7 @@ import (
 
 func main() {
 	app := fiber.New()
-	db.Init()
+	database.Init()
 
 	router.Route(app)
 
