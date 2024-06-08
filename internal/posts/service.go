@@ -2,13 +2,10 @@ package posts
 
 import (
 	"github.com/google/uuid"
+	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/users"
 )
-
-// should load from .env
-var maxContentLength = 1000
-var site = "127.0.0.1:8000"
 
 type Post struct {
 	ID          string          `json:"id"`
@@ -22,24 +19,26 @@ type Post struct {
 	Replies     []*Post         `json:"replies,omitempty"`
 }
 
-func newID() string {
-	return site + "/posts/" + uuid.New().String()
-}
-
-func fullID(id string) string {
-	return site + "/posts/" + id
-}
-
 // services
 
 type PostService struct {
+	cfg  config.EnvConfig
 	db   database.IPostDb
 	user *users.UserService
 }
 
 func NewService(db database.IPostDb, us *users.UserService) *PostService {
 	return &PostService{
+		cfg:  config.Get(),
 		db:   db,
 		user: us,
 	}
+}
+
+func (service *PostService) newID() string {
+	return service.cfg.Site + "/posts/" + uuid.New().String()
+}
+
+func (service *PostService) fullID(id string) string {
+	return service.cfg.Site + "/posts/" + id
 }

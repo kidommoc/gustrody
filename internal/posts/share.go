@@ -6,7 +6,7 @@ import (
 )
 
 func (service *PostService) Share(username string, postID string) utils.Err {
-	if err := service.db.SetShare(username, fullID(postID)); err != nil {
+	if err := service.db.SetShare(username, service.fullID(postID)); err != nil {
 		switch {
 		case err.Code() == database.ErrNotFound:
 			return utils.NewErr(ErrPostNotFound)
@@ -16,7 +16,7 @@ func (service *PostService) Share(username string, postID string) utils.Err {
 }
 
 func (service *PostService) Unshare(username string, postID string) utils.Err {
-	if err := service.db.RemoveShare(username, fullID(postID)); err != nil {
+	if err := service.db.RemoveShare(username, service.fullID(postID)); err != nil {
 		switch err.Code() {
 		case database.ErrNotFound:
 			switch err.Error() {

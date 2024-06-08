@@ -14,15 +14,15 @@ func (service *PostService) Reply(username string, postID string, content string
 	if content == "" {
 		return utils.NewErr(ErrContent, "empty")
 	}
-	if utf8.RuneCountInString(content) > maxContentLength {
+	if utf8.RuneCountInString(content) > service.cfg.MaxContentLength {
 		return utils.NewErr(ErrContent, "long")
 	}
 
-	id := newID()
+	id := service.newID()
 	for service.db.IsPostExist(id) {
-		id = newID()
+		id = service.newID()
 	}
-	if e := service.db.SetReply(username, id, fullID(postID), content); e != nil {
+	if e := service.db.SetReply(username, id, service.fullID(postID), content); e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
 			return utils.NewErr(ErrPostNotFound)

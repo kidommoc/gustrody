@@ -13,7 +13,7 @@ func (service *UserService) GetInfo(username string) (info UserInfo, err utils.E
 	if e != nil {
 		return info, utils.NewErr(ErrNotFound)
 	}
-	info.ID = generateID(u.Username)
+	info.ID = service.generateID(u.Username)
 	info.Username = u.Username
 	info.Nickname = u.Nickname
 	return info, nil
@@ -26,7 +26,7 @@ func (service *UserService) GetProfile(username string) (info UserProfile, err u
 	}
 	info = UserProfile{
 		UserInfo: UserInfo{
-			ID:       generateID(u.Username),
+			ID:       service.generateID(u.Username),
 			Username: u.Username,
 			Nickname: u.Nickname,
 		},
@@ -47,7 +47,7 @@ func (service *UserService) GetFollowings(username string) (list []*UserInfo, er
 	}
 	for _, u := range l {
 		list = append(list, &UserInfo{
-			ID:       generateID(u.Username),
+			ID:       service.generateID(u.Username),
 			Username: u.Username,
 			Nickname: u.Nickname,
 		})
@@ -63,7 +63,7 @@ func (service *UserService) GetFollowers(username string) (list []*UserInfo, err
 	}
 	for _, u := range l {
 		list = append(list, &UserInfo{
-			ID:       generateID(u.Username),
+			ID:       service.generateID(u.Username),
 			Username: u.Username,
 			Nickname: u.Nickname,
 		})

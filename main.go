@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/database"
 	"github.com/kidommoc/gustrody/internal/router"
 
@@ -10,10 +11,12 @@ import (
 )
 
 func main() {
-	app := fiber.New()
+	cfg := config.Get()
 	database.Init()
 
+	app := fiber.New()
 	router.Route(app)
 
-	fmt.Println(app.Listen(":8000"))
+	addr := fmt.Sprintf(":%d", cfg.Port)
+	fmt.Println(app.Listen(addr))
 }

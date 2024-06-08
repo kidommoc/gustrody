@@ -1,10 +1,9 @@
 package users
 
 import (
+	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/database"
 )
-
-var site = "127.0.0.1:8000" // should load from .env
 
 type UserInfo struct {
 	ID       string `json:"id"`
@@ -21,18 +20,20 @@ type UserProfile struct {
 	Followers  string `json:"followers"`
 }
 
-func generateID(username string) string {
-	return site + "/users/" + username
-}
-
 // user service
 
 type UserService struct {
-	db database.IUsersDb
+	cfg config.EnvConfig
+	db  database.IUsersDb
 }
 
 func NewService(db database.IUsersDb) *UserService {
 	return &UserService{
-		db: db,
+		cfg: config.Get(),
+		db:  db,
 	}
+}
+
+func (service *UserService) generateID(username string) string {
+	return service.cfg.Site + "/users/" + username
 }

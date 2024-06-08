@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
@@ -49,6 +50,7 @@ type IPostDb interface {
 
 // should implemented with Postgre
 type PostDb struct {
+	cfg     config.EnvConfig
 	postDb  map[string]*Post
 	shareDb []*Share
 }
@@ -58,6 +60,7 @@ var postsIns *PostDb = nil
 func PostInstance() *PostDb {
 	if postsIns == nil {
 		postsIns = &PostDb{
+			cfg:     config.Get(),
 			postDb:  make(map[string]*Post),
 			shareDb: make([]*Share, 0, 100),
 		}
@@ -69,9 +72,8 @@ func PostInstance() *PostDb {
 
 func initPostDb() {
 	db := PostInstance()
-	site := "127.0.0.1:8000"
 	id := func() string {
-		return site + "/posts/" + uuid.New().String()
+		return db.cfg.Site + "/posts/" + uuid.New().String()
 	}
 	tmp1 := id()
 	db.SetPost(tmp1, "u1", "p:u1-1")
