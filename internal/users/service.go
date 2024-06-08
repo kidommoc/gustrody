@@ -23,17 +23,18 @@ type UserProfile struct {
 // user service
 
 type UserService struct {
-	cfg config.EnvConfig
-	db  database.IUsersDb
+	site string
+	db   database.IUsersDb
 }
 
 func NewService(db database.IUsersDb) *UserService {
+	cfg := config.Get()
 	return &UserService{
-		cfg: config.Get(),
-		db:  db,
+		site: cfg.Site,
+		db:   db,
 	}
 }
 
 func (service *UserService) generateID(username string) string {
-	return service.cfg.Site + "/users/" + username
+	return service.site + "/users/" + username
 }

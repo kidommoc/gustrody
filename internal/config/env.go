@@ -1,12 +1,14 @@
 package config
 
 import (
+	"flag"
 	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 type EnvConfig struct {
+	Debug   bool   `json:"debug"`
 	Site    string `json:"site"`
 	Port    int    `json:"port"`
 	HmacKey string `json:"hmacKey"`
@@ -28,6 +30,8 @@ func loadEnv() {
 		// handle error
 	}
 	config = new(EnvConfig)
+
+	config.Debug = *flag.Bool("debug", false, "debug mode")
 
 	site := envmap["SITE"]
 	// check site
@@ -81,4 +85,9 @@ func Get() EnvConfig {
 		loadEnv()
 	}
 	return *config
+}
+
+// USE IT CAREFULLY!
+func Set(cfg EnvConfig) {
+	config = &cfg
 }

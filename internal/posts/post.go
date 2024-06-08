@@ -161,7 +161,7 @@ func (service *PostService) New(username string, content string) utils.Err {
 	if content == "" {
 		return utils.NewErr(ErrContent, "empty")
 	}
-	if utf8.RuneCountInString(content) > service.cfg.MaxContentLength {
+	if utf8.RuneCountInString(content) > service.maxContentLength {
 		return utils.NewErr(ErrContent, "long")
 	}
 
@@ -179,7 +179,7 @@ func (service *PostService) Edit(username string, postID string, content string)
 	if content == "" {
 		return utils.NewErr(ErrContent, "empty")
 	}
-	if utf8.RuneCountInString(content) > service.cfg.MaxContentLength {
+	if utf8.RuneCountInString(content) > service.maxContentLength {
 		return utils.NewErr(ErrContent, "too long")
 	}
 

@@ -50,7 +50,7 @@ type IPostDb interface {
 
 // should implemented with Postgre
 type PostDb struct {
-	cfg     config.EnvConfig
+	site    string
 	postDb  map[string]*Post
 	shareDb []*Share
 }
@@ -58,9 +58,10 @@ type PostDb struct {
 var postsIns *PostDb = nil
 
 func PostInstance() *PostDb {
+	cfg := config.Get()
 	if postsIns == nil {
 		postsIns = &PostDb{
-			cfg:     config.Get(),
+			site:    cfg.Site,
 			postDb:  make(map[string]*Post),
 			shareDb: make([]*Share, 0, 100),
 		}
@@ -73,7 +74,7 @@ func PostInstance() *PostDb {
 func initPostDb() {
 	db := PostInstance()
 	id := func() string {
-		return db.cfg.Site + "/posts/" + uuid.New().String()
+		return db.site + "/posts/" + uuid.New().String()
 	}
 	tmp1 := id()
 	db.SetPost(tmp1, "u1", "p:u1-1")

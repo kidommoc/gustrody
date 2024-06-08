@@ -22,23 +22,26 @@ type Post struct {
 // services
 
 type PostService struct {
-	cfg  config.EnvConfig
-	db   database.IPostDb
-	user *users.UserService
+	site             string
+	maxContentLength int
+	db               database.IPostDb
+	user             *users.UserService
 }
 
 func NewService(db database.IPostDb, us *users.UserService) *PostService {
+	cfg := config.Get()
 	return &PostService{
-		cfg:  config.Get(),
-		db:   db,
-		user: us,
+		site:             cfg.Site,
+		maxContentLength: cfg.MaxContentLength,
+		db:               db,
+		user:             us,
 	}
 }
 
 func (service *PostService) newID() string {
-	return service.cfg.Site + "/posts/" + uuid.New().String()
+	return service.site + "/posts/" + uuid.New().String()
 }
 
 func (service *PostService) fullID(id string) string {
-	return service.cfg.Site + "/posts/" + id
+	return service.site + "/posts/" + id
 }

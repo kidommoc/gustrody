@@ -14,7 +14,7 @@ func (service *PostService) Reply(username string, postID string, content string
 	if content == "" {
 		return utils.NewErr(ErrContent, "empty")
 	}
-	if utf8.RuneCountInString(content) > service.cfg.MaxContentLength {
+	if utf8.RuneCountInString(content) > service.maxContentLength {
 		return utils.NewErr(ErrContent, "long")
 	}
 
