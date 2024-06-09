@@ -11,7 +11,7 @@ func (service *UserService) IsUserExist(username string) bool {
 func (service *UserService) GetInfo(username string) (info UserInfo, err utils.Err) {
 	u, e := service.db.QueryUser(username)
 	if e != nil {
-		return info, utils.NewErr(ErrNotFound)
+		return info, utils.NewErr(ErrNotFound, username)
 	}
 	info.ID = service.generateID(u.Username)
 	info.Username = u.Username
@@ -22,7 +22,7 @@ func (service *UserService) GetInfo(username string) (info UserInfo, err utils.E
 func (service *UserService) GetProfile(username string) (info UserProfile, err utils.Err) {
 	u, e := service.db.QueryUser(username)
 	if e != nil {
-		return info, utils.NewErr(ErrNotFound)
+		return info, utils.NewErr(ErrNotFound, username)
 	}
 	info = UserProfile{
 		UserInfo: UserInfo{
@@ -43,7 +43,7 @@ func (service *UserService) GetFollowings(username string) (list []*UserInfo, er
 	list = make([]*UserInfo, 0)
 	l, e := service.db.QueryUserFollowings(username)
 	if e != nil {
-		return list, utils.NewErr(ErrNotFound)
+		return list, utils.NewErr(ErrNotFound, username)
 	}
 	for _, u := range l {
 		list = append(list, &UserInfo{
@@ -59,7 +59,7 @@ func (service *UserService) GetFollowers(username string) (list []*UserInfo, err
 	list = make([]*UserInfo, 0)
 	l, e := service.db.QueryUserFollowers(username)
 	if e != nil {
-		return list, utils.NewErr(ErrNotFound)
+		return list, utils.NewErr(ErrNotFound, username)
 	}
 	for _, u := range l {
 		list = append(list, &UserInfo{

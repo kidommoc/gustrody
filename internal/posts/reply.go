@@ -8,24 +8,25 @@ import (
 )
 
 func (service *PostService) Reply(username string, postID string, content string) utils.Err {
+	postID = service.fullID(postID)
 	if !service.user.IsUserExist(username) {
-		return utils.NewErr(ErrUserNotFound)
+		return newErr(ErrUserNotFound, username)
 	}
 	if content == "" {
-		return utils.NewErr(ErrContent, "empty")
+		return newErr(ErrContent, "empty")
 	}
 	if utf8.RuneCountInString(content) > service.maxContentLength {
-		return utils.NewErr(ErrContent, "long")
+		return newErr(ErrContent, "too long")
 	}
 
 	id := service.newID()
 	for service.db.IsPostExist(id) {
 		id = service.newID()
 	}
-	if e := service.db.SetReply(username, id, service.fullID(postID), content); e != nil {
+	if e := service.db.SetReply(username, id, postID, content); e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
-			return utils.NewErr(ErrPostNotFound)
+			return newErr(ErrPostNotFound, postID)
 			// default:
 		}
 	}
@@ -37,7 +38,7 @@ func (service *PostService) Reply(username string, postID string, content string
 func (service *PostService) setReplies(p *Post) utils.Err {
 	rt, rs, e := service.db.QueryPostReplies(p.ID)
 	if e != nil {
-		return utils.NewErr(ErrPostNotFound)
+		return newErr(ErrPostNotFound, p.ID)
 	}
 
 	// replying to. as (linked) list

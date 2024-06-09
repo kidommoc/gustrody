@@ -28,8 +28,13 @@ type PostService struct {
 	user             *users.UserService
 }
 
-func NewService(db database.IPostDb, us *users.UserService) *PostService {
-	cfg := config.Get()
+func NewService(db database.IPostDb, us *users.UserService, c ...config.EnvConfig) *PostService {
+	var cfg config.EnvConfig
+	if len(c) == 0 {
+		cfg = config.Get()
+	} else {
+		cfg = c[0]
+	}
 	return &PostService{
 		site:             cfg.Site,
 		maxContentLength: cfg.MaxContentLength,

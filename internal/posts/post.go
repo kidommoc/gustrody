@@ -12,7 +12,7 @@ import (
 func (service *PostService) makePost(p *database.Post) (post Post, err utils.Err) {
 	u, e := service.user.GetInfo(p.User)
 	if e != nil {
-		return post, utils.NewErr(ErrUserNotFound)
+		return post, newErr(ErrUserNotFound)
 	}
 
 	post = Post{
@@ -28,11 +28,12 @@ func (service *PostService) makePost(p *database.Post) (post Post, err utils.Err
 }
 
 func (service *PostService) Get(postID string) (post Post, err utils.Err) {
-	result, e := service.db.QueryPostByID(service.fullID(postID))
+	postID = service.fullID(postID)
+	result, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
-			return post, utils.NewErr(ErrPostNotFound)
+			return post, newErr(ErrPostNotFound, postID)
 			// default:
 		}
 	}
@@ -41,7 +42,7 @@ func (service *PostService) Get(postID string) (post Post, err utils.Err) {
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "user":
-			return post, utils.NewErr(ErrOwner)
+			return post, newErr(ErrOwner, "not found")
 			// default:
 		}
 	}
@@ -51,11 +52,12 @@ func (service *PostService) Get(postID string) (post Post, err utils.Err) {
 }
 
 func (service *PostService) GetLikes(postID string) (list []*users.UserInfo, err utils.Err) {
-	result, e := service.db.QueryPostByID(service.fullID(postID))
+	postID = service.fullID(postID)
+	result, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
-			return list, utils.NewErr(ErrPostNotFound)
+			return list, newErr(ErrPostNotFound, postID)
 			// default:
 		}
 	}
@@ -72,11 +74,12 @@ func (service *PostService) GetLikes(postID string) (list []*users.UserInfo, err
 }
 
 func (service *PostService) GetShares(postID string) (list []*users.UserInfo, err utils.Err) {
-	result, e := service.db.QueryPostByID(service.fullID(postID))
+	postID = service.fullID(postID)
+	result, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
-			return list, utils.NewErr(ErrPostNotFound)
+			return list, newErr(ErrPostNotFound, postID)
 			// default:
 		}
 	}
@@ -97,7 +100,7 @@ func (service *PostService) GetByUser(username string) (list []*Post, err utils.
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "user":
-			return list, utils.NewErr(ErrUserNotFound)
+			return list, newErr(ErrUserNotFound, username)
 			// default:
 		}
 	}
@@ -156,13 +159,13 @@ func (service *PostService) GetByUser(username string) (list []*Post, err utils.
 
 func (service *PostService) New(username string, content string) utils.Err {
 	if !service.user.IsUserExist(username) {
-		return utils.NewErr(ErrUserNotFound)
+		return newErr(ErrUserNotFound, username)
 	}
 	if content == "" {
-		return utils.NewErr(ErrContent, "empty")
+		return newErr(ErrContent, "empty")
 	}
 	if utf8.RuneCountInString(content) > service.maxContentLength {
-		return utils.NewErr(ErrContent, "long")
+		return newErr(ErrContent, "too long")
 	}
 
 	id := service.newID()
@@ -177,25 +180,26 @@ func (service *PostService) New(username string, content string) utils.Err {
 
 func (service *PostService) Edit(username string, postID string, content string) utils.Err {
 	if content == "" {
-		return utils.NewErr(ErrContent, "empty")
+		return newErr(ErrContent, "empty")
 	}
 	if utf8.RuneCountInString(content) > service.maxContentLength {
-		return utils.NewErr(ErrContent, "too long")
+		return newErr(ErrContent, "too long")
 	}
 
-	post, e := service.db.QueryPostByID(service.fullID(postID))
+	postID = service.fullID(postID)
+	post, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
-			return utils.NewErr(ErrPostNotFound)
+			return newErr(ErrPostNotFound, postID)
 			// default:
 		}
 	}
 	if post.User != username {
-		return utils.NewErr(ErrOwner)
+		return newErr(ErrOwner, "not "+username)
 	}
 
-	if e := service.db.UpdatePost(service.fullID(postID), content); e != nil {
+	if e := service.db.UpdatePost(postID, content); e != nil {
 		switch {
 		// default:
 		}
@@ -205,19 +209,20 @@ func (service *PostService) Edit(username string, postID string, content string)
 }
 
 func (service *PostService) Remove(username string, postID string) utils.Err {
-	post, e := service.db.QueryPostByID(service.fullID(postID))
+	postID = service.fullID(postID)
+	post, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
 		case e.Code() == database.ErrNotFound && e.Error() == "post":
-			return utils.NewErr(ErrPostNotFound)
+			return newErr(ErrPostNotFound, postID)
 			// default:
 		}
 	}
 	if post.User != username {
-		return utils.NewErr(ErrOwner)
+		return newErr(ErrOwner, "not "+username)
 	}
 
-	if e := service.db.RemovePost(service.fullID(postID)); e != nil {
+	if e := service.db.RemovePost(postID); e != nil {
 		switch {
 		// default:
 		}

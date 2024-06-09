@@ -38,7 +38,7 @@ func initAuthDb() {
 func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err utils.Err) {
 	passwd := db.loginDb[username]
 	if passwd == "" {
-		return "", utils.NewErr(ErrNotFound, "user")
+		return "", newErr(ErrNotFound, "user "+username)
 	}
 	return passwd, nil
 }
@@ -46,7 +46,7 @@ func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err uti
 func (db *AuthDb) QueryUserOfSession(session string) (username string, err utils.Err) {
 	username = db.sessionDb[session]
 	if username == "" {
-		return "", utils.NewErr(ErrNotFound, "user")
+		return "", newErr(ErrNotFound, "user "+username)
 	}
 	return username, nil
 }

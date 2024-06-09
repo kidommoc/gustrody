@@ -73,23 +73,23 @@ func (service *OauthService) VerifyToken(token string, session string) (username
 	if !parsed.Valid {
 		switch {
 		case errors.Is(e, jwt.ErrTokenExpired):
-			return "", utils.NewErr(ErrExpired)
+			return "", newErr(ErrExpired)
 		default:
-			return "", utils.NewErr(ErrInvalid)
+			return "", newErr(ErrInvalid)
 		}
 	}
 
 	username, e = parsed.Claims.GetIssuer()
 	if e != nil {
-		return "", utils.NewErr(ErrInvalid)
+		return "", newErr(ErrInvalid)
 	}
 	sess, e := parsed.Claims.GetSubject()
 	if e != nil {
-		return "", utils.NewErr(ErrInvalid)
+		return "", newErr(ErrInvalid)
 	}
 
 	if sess != session {
-		return "", utils.NewErr(ErrWrongSession)
+		return "", newErr(ErrWrongSession)
 	}
 	return username, nil
 }
@@ -97,10 +97,10 @@ func (service *OauthService) VerifyToken(token string, session string) (username
 func (service *OauthService) Login(username string, password string) (session string, oauth OauthToken, err utils.Err) {
 	p, err := service.db.QueryPasswordOfUser(username)
 	if err != nil {
-		return "", oauth, utils.NewErr(ErrUserNotFound)
+		return "", oauth, newErr(ErrUserNotFound)
 	}
 	if p != password {
-		return "", oauth, utils.NewErr(ErrWrongPassword)
+		return "", oauth, newErr(ErrWrongPassword)
 	}
 	session = generateSession()
 	service.db.SetSession(session, username)

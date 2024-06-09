@@ -96,14 +96,14 @@ func (db *UsersDb) checkFollow(from string, to string) int {
 
 func (db *UsersDb) QueryUser(username string) (user User, err utils.Err) {
 	if !db.IsUserExist(username) {
-		return user, utils.NewErr(ErrNotFound, "user")
+		return user, newErr(ErrNotFound, "user "+username)
 	}
 	return *db.infoDb[username], nil
 }
 
 func (db *UsersDb) QueryUserFollows(username string) (count uint, err utils.Err) {
 	if !db.IsUserExist(username) {
-		return 0, utils.NewErr(ErrNotFound, "user")
+		return 0, newErr(ErrNotFound, "user "+username)
 	}
 	count = 0
 	for _, f := range db.followsDb {
@@ -116,7 +116,7 @@ func (db *UsersDb) QueryUserFollows(username string) (count uint, err utils.Err)
 
 func (db *UsersDb) QueryUserFollowed(username string) (count uint, err utils.Err) {
 	if !db.IsUserExist(username) {
-		return 0, utils.NewErr(ErrNotFound, "user")
+		return 0, newErr(ErrNotFound, "user "+username)
 	}
 	count = 0
 	for _, f := range db.followsDb {
@@ -130,7 +130,7 @@ func (db *UsersDb) QueryUserFollowed(username string) (count uint, err utils.Err
 func (db *UsersDb) QueryUserFollowings(username string) (list []*User, err utils.Err) {
 	list = make([]*User, 0)
 	if !db.IsUserExist(username) {
-		return list, utils.NewErr(ErrNotFound, "user")
+		return list, newErr(ErrNotFound, "user "+username)
 	}
 	for _, f := range db.followsDb {
 		if f.From == username {
@@ -143,7 +143,7 @@ func (db *UsersDb) QueryUserFollowings(username string) (list []*User, err utils
 func (db *UsersDb) QueryUserFollowers(username string) (list []*User, err utils.Err) {
 	list = make([]*User, 0)
 	if !db.IsUserExist(username) {
-		return list, utils.NewErr(ErrNotFound, "user")
+		return list, newErr(ErrNotFound, "user "+username)
 	}
 	for _, f := range db.followsDb {
 		if f.To == username {
@@ -155,10 +155,10 @@ func (db *UsersDb) QueryUserFollowers(username string) (list []*User, err utils.
 
 func (db *UsersDb) SetFollow(from string, to string) utils.Err {
 	if !db.IsUserExist(from) {
-		return utils.NewErr(ErrNotFound, "from")
+		return newErr(ErrNotFound, "from "+from)
 	}
 	if !db.IsUserExist(to) {
-		return utils.NewErr(ErrNotFound, "to")
+		return newErr(ErrNotFound, "to "+to)
 	}
 	if index := db.checkFollow(from, to); index == -1 {
 		db.followsDb = append(db.followsDb, &follow{From: from, To: to})
@@ -168,10 +168,10 @@ func (db *UsersDb) SetFollow(from string, to string) utils.Err {
 
 func (db *UsersDb) RemoveFollow(from string, to string) utils.Err {
 	if !db.IsUserExist(from) {
-		return utils.NewErr(ErrNotFound, "from")
+		return newErr(ErrNotFound, "from "+from)
 	}
 	if !db.IsUserExist(to) {
-		return utils.NewErr(ErrNotFound, "to")
+		return newErr(ErrNotFound, "to "+to)
 	}
 	if index := db.checkFollow(from, to); index != -1 {
 		db.followsDb = slices.Delete(db.followsDb, index, index+1)

@@ -6,24 +6,26 @@ import (
 )
 
 func (service *PostService) Like(username string, postID string) utils.Err {
-	if err := service.db.SetLike(username, service.fullID(postID)); err != nil {
+	postID = service.fullID(postID)
+	if err := service.db.SetLike(username, postID); err != nil {
 		switch {
 		case err.Code() == database.ErrNotFound:
-			return utils.NewErr(ErrPostNotFound)
+			return newErr(ErrPostNotFound, postID)
 		}
 	}
 	return nil
 }
 
 func (service *PostService) Unlike(username string, postID string) utils.Err {
-	if err := service.db.RemoveLike(username, service.fullID(postID)); err != nil {
+	postID = service.fullID(postID)
+	if err := service.db.RemoveLike(username, postID); err != nil {
 		switch err.Code() {
 		case database.ErrNotFound:
 			switch err.Error() {
 			case "post":
-				return utils.NewErr(ErrPostNotFound)
+				return newErr(ErrPostNotFound, postID)
 			case "like":
-				return utils.NewErr(ErrLikeNotFound)
+				return newErr(ErrLikeNotFound, username)
 			}
 		}
 	}

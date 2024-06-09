@@ -13,6 +13,11 @@ type EnvConfig struct {
 	Port    int    `json:"port"`
 	HmacKey string `json:"hmacKey"`
 
+	// logging
+	Logfile  string `json:"logfile"`
+	LogSplit int    `json:"logSplit"`
+	LogLevel int    `json:"logLevel"`
+
 	// database
 	PqUser   string `json:"pqUser"`
 	PqSecret string `json:"pqSecret"`
@@ -50,6 +55,27 @@ func loadEnv() {
 		hmacKey = "penguin"
 	}
 	config.HmacKey = hmacKey
+
+	// logfile path. default: "./logging.log"
+	logfile := envmap["LOGFILE"]
+	if logfile == "" {
+		logfile = "./logging.log"
+	}
+	config.Logfile = logfile
+
+	// how to split logfile. default: 0(none)
+	logSplit, e := strconv.Atoi(envmap["LOG_SPLIT"])
+	if e != nil || logSplit < 0 || logSplit > 1 {
+		logSplit = 0
+	}
+	config.LogSplit = logSplit
+
+	// log level. default: 1(warning)
+	logLevel, e := strconv.Atoi(envmap["LOG_LEVEL"])
+	if e != nil || logLevel < 0 || logLevel > 3 {
+		logLevel = 1
+	}
+	config.LogLevel = logLevel
 
 	// postgresql user. default: penguin
 	pqUser := envmap["POSTGRES_USER"]

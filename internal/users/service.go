@@ -27,8 +27,13 @@ type UserService struct {
 	db   database.IUsersDb
 }
 
-func NewService(db database.IUsersDb) *UserService {
-	cfg := config.Get()
+func NewService(db database.IUsersDb, c ...config.EnvConfig) *UserService {
+	var cfg config.EnvConfig
+	if len(c) == 0 {
+		cfg = config.Get()
+	} else {
+		cfg = c[0]
+	}
 	return &UserService{
 		site: cfg.Site,
 		db:   db,

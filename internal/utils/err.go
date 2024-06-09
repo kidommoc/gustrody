@@ -1,9 +1,12 @@
 package utils
 
+import "strconv"
+
 type ErrCode uint
 
 type Err interface {
 	Code() ErrCode
+	CodeString() string
 	Error() string
 }
 
@@ -18,6 +21,10 @@ func (e err) Error() string {
 
 func (e err) Code() ErrCode {
 	return e.code
+}
+
+func (e err) CodeString() string {
+	return strconv.Itoa(int(e.code))
 }
 
 func NewErr(code ErrCode, msg ...string) Err {

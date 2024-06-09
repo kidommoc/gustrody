@@ -116,14 +116,14 @@ func (db *PostDb) IsPostExist(id string) bool {
 
 func (db *PostDb) QueryPostByID(id string) (post Post, err utils.Err) {
 	if !db.IsPostExist(id) {
-		return post, utils.NewErr(ErrNotFound, "post")
+		return post, newErr(ErrNotFound, "post "+id)
 	}
 	return *db.postDb[id], nil
 }
 
 func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Post, err utils.Err) {
 	if !db.IsPostExist(id) {
-		return nil, nil, utils.NewErr(ErrNotFound, "post")
+		return nil, nil, newErr(ErrNotFound, "post "+id)
 	}
 	p := db.postDb[id]
 
@@ -212,7 +212,7 @@ func (db *PostDb) QuerySharesByUser(user string, asec bool) (l []*Share, err uti
 
 func (db *PostDb) SetPost(id string, user string, content string) utils.Err {
 	if db.IsPostExist(id) {
-		return utils.NewErr(ErrDunplicate, "post")
+		return newErr(ErrDunplicate, "post "+id)
 	}
 
 	p := &Post{
@@ -229,7 +229,7 @@ func (db *PostDb) SetPost(id string, user string, content string) utils.Err {
 
 func (db *PostDb) UpdatePost(id string, content string) utils.Err {
 	if !db.IsPostExist(id) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 
 	p := db.postDb[id]
@@ -240,7 +240,7 @@ func (db *PostDb) UpdatePost(id string, content string) utils.Err {
 
 func (db *PostDb) RemovePost(id string) utils.Err {
 	if !db.IsPostExist(id) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 
 	delete(db.postDb, id)
@@ -249,7 +249,7 @@ func (db *PostDb) RemovePost(id string) utils.Err {
 
 func (db *PostDb) SetLike(user string, id string) utils.Err {
 	if !db.IsPostExist(id) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 
 	p := db.postDb[id]
@@ -264,7 +264,7 @@ func (db *PostDb) SetLike(user string, id string) utils.Err {
 
 func (db *PostDb) RemoveLike(user string, id string) utils.Err {
 	if !db.IsPostExist(id) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 
 	p := db.postDb[id]
@@ -274,12 +274,12 @@ func (db *PostDb) RemoveLike(user string, id string) utils.Err {
 			return nil
 		}
 	}
-	return utils.NewErr(ErrNotFound, "like")
+	return newErr(ErrNotFound, "like "+user)
 }
 
 func (db *PostDb) SetShare(user string, id string) utils.Err {
 	if !db.IsPostExist(id) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 
 	p := db.postDb[id]
@@ -299,7 +299,7 @@ func (db *PostDb) SetShare(user string, id string) utils.Err {
 
 func (db *PostDb) RemoveShare(user string, id string) utils.Err {
 	if !db.IsPostExist(id) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 	p := db.postDb[id]
 
@@ -312,7 +312,7 @@ func (db *PostDb) RemoveShare(user string, id string) utils.Err {
 				return nil
 			}
 		}
-		return utils.NewErr(ErrNotFound)
+		return newErr(ErrNotFound)
 	}()
 
 	err2 := func() utils.Err {
@@ -322,11 +322,11 @@ func (db *PostDb) RemoveShare(user string, id string) utils.Err {
 				return nil
 			}
 		}
-		return utils.NewErr(ErrNotFound)
+		return newErr(ErrNotFound)
 	}()
 
 	if err1 != nil || err2 != nil {
-		return utils.NewErr(ErrNotFound, "share")
+		return newErr(ErrNotFound, "share "+user)
 	} else {
 		return nil
 	}
@@ -334,10 +334,10 @@ func (db *PostDb) RemoveShare(user string, id string) utils.Err {
 
 func (db *PostDb) SetReply(user string, id string, replying string, content string) utils.Err {
 	if db.IsPostExist(id) {
-		return utils.NewErr(ErrDunplicate, "post")
+		return newErr(ErrDunplicate, "post "+id)
 	}
 	if !db.IsPostExist(replying) {
-		return utils.NewErr(ErrNotFound, "post")
+		return newErr(ErrNotFound, "post "+id)
 	}
 
 	r := &Post{

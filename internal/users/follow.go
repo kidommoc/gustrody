@@ -7,14 +7,14 @@ import (
 
 func (service *UserService) Follow(actor string, target string) utils.Err {
 	if actor == target {
-		return utils.NewErr(ErrSelfFollow)
+		return utils.NewErr(ErrSelfFollow, actor)
 	}
 	if err := service.db.SetFollow(actor, target); err != nil {
 		switch {
 		case err.Code() == database.ErrNotFound && err.Error() == "from":
-			return utils.NewErr(ErrNotFound, "from")
+			return utils.NewErr(ErrNotFound, "from "+actor)
 		case err.Code() == database.ErrNotFound && err.Error() == "to":
-			return utils.NewErr(ErrNotFound, "to")
+			return utils.NewErr(ErrNotFound, "to "+target)
 		default:
 			return err
 		}
@@ -24,14 +24,14 @@ func (service *UserService) Follow(actor string, target string) utils.Err {
 
 func (service *UserService) Unfollow(actor string, target string) utils.Err {
 	if actor == target {
-		return utils.NewErr(ErrSelfFollow)
+		return utils.NewErr(ErrSelfFollow, actor)
 	}
 	if err := service.db.RemoveFollow(actor, target); err != nil {
 		switch {
 		case err.Code() == database.ErrNotFound && err.Error() == "from":
-			return utils.NewErr(ErrNotFound, "from")
+			return utils.NewErr(ErrNotFound, "from "+actor)
 		case err.Code() == database.ErrNotFound && err.Error() == "to":
-			return utils.NewErr(ErrNotFound, "to")
+			return utils.NewErr(ErrNotFound, "to "+target)
 		default:
 			return err
 		}
