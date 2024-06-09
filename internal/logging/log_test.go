@@ -34,8 +34,8 @@ func TestShenllLogger(t *testing.T) {
 	}
 	logger := Get(cfg)
 	logger.level = 3
-	logger.LogInfo("This is an info message")
-	logger.LogInfo("This is an info with attachments",
+	logger.Info("This is an info message")
+	logger.Info("This is an info with attachments",
 		"id", "abcdef",
 		"name", "xyzabc",
 		"age", 572,
@@ -45,7 +45,7 @@ func TestShenllLogger(t *testing.T) {
 	e := E{
 		Err: utils.NewErr(errcode, "errmsg"),
 	}
-	logger.LogError("This is an error message", e)
+	logger.Error("This is an error message", e)
 }
 
 func TestFileLogger(t *testing.T) {
@@ -60,8 +60,8 @@ func TestFileLogger(t *testing.T) {
 	}
 	logger := Get(cfg)
 	logger.level = 0
-	logger.LogInfo("This is an info message")
-	logger.LogInfo("This is an info with attachments",
+	logger.Info("This is an info message")
+	logger.Info("This is an info with attachments",
 		"id", "abcdef",
 		"name", "xyzabc",
 		"age", 572,
@@ -71,5 +71,5 @@ func TestFileLogger(t *testing.T) {
 	e := E{
 		Err: utils.NewErr(errcode, "errmsg"),
 	}
-	logger.LogError("This is an error message", e)
+	logger.Error("This is an error message", e)
 }

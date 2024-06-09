@@ -1,12 +1,15 @@
 package database
 
-import "fmt"
+import (
+	"github.com/kidommoc/gustrody/internal/logging"
+)
 
 func Init() {
+	logger := logging.Get()
 	initAuthDb()
-	fmt.Println("[DB]Initailized AuthDb")
+	logger.Info("[DB]Initailized AuthDb")
 	initUserDb()
-	fmt.Println("[DB]Initailized UserDb")
+	logger.Info("[DB]Initailized UserDb")
 	initPostDb()
-	fmt.Println("[DB]Initailized PostDb")
+	logger.Info("[DB]Initailized PostDb")
 }

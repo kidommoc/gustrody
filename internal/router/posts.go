@@ -1,11 +1,11 @@
 package router
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/database"
+	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/posts"
 	"github.com/kidommoc/gustrody/internal/users"
 )
@@ -48,7 +48,8 @@ func getPost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]GET: request for %s\n", postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]GET: request for %s\n", postID)
 	c.Status(fiber.StatusOK)
 	return c.JSON(post)
 }
@@ -73,7 +74,8 @@ func getPostLikes(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]GET: request for likes of %s\n", postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]GET: request for likes of %s\n", postID)
 	c.Status(fiber.StatusOK)
 	return c.JSON(list)
 }
@@ -98,7 +100,8 @@ func getPostShares(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]GET: request for shares of %s\n", postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]GET: request for shares of %s\n", postID)
 	c.Status(fiber.StatusOK)
 	return c.JSON(list)
 }
@@ -139,7 +142,8 @@ func newPost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]NEW: %s posts a new post\n", username)
+	logger := logging.Get()
+	logger.Info("[POSTS]NEW: %s posts a new post\n", username)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -183,7 +187,8 @@ func editPost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]EDIT: %s edits %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]EDIT: %s edits %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -213,7 +218,8 @@ func removePost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]REMOVE: %s removes %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]REMOVE: %s removes %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -240,7 +246,8 @@ func likePost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]LIKE: %s likes %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]LIKE: %s likes %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -270,7 +277,8 @@ func unlikePost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]UNLIKE: %s unlikes %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]UNLIKE: %s unlikes %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -297,7 +305,8 @@ func sharePost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]SHARE: %s shares %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]SHARE: %s shares %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -327,7 +336,8 @@ func unsharePost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]UNSHARE: %s unshares %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]UNSHARE: %s unshares %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -371,6 +381,7 @@ func replyPost(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[POSTS]REPLY: %s replies %s\n", username, postID)
+	logger := logging.Get()
+	logger.Info("[POSTS]REPLY: %s replies %s\n", username, postID)
 	return c.SendStatus(fiber.StatusOK)
 }

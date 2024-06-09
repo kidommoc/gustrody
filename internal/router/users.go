@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/database"
+	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/posts"
 	"github.com/kidommoc/gustrody/internal/users"
 )
@@ -38,7 +39,8 @@ func getUserProfile(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[USERS]GET: request for %s\n", username)
+	logger := logging.Get()
+	logger.Info("[USERS]GET: request for %s\n", username)
 	c.Status(fiber.StatusOK)
 	return c.JSON(profile)
 }
@@ -63,7 +65,8 @@ func getUserPosts(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[USERS]GET: request for posts of %s\n", username)
+	logger := logging.Get()
+	logger.Info("[USERS]GET: request for posts of %s\n", username)
 	c.Status(fiber.StatusOK)
 	return c.JSON(list)
 }
@@ -87,7 +90,8 @@ func getUserFollowings(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[USERS]GET: request for followings of %s\n", username)
+	logger := logging.Get()
+	logger.Info("[USERS]GET: request for followings of %s\n", username)
 	c.Status(fiber.StatusOK)
 	return c.JSON(fiber.Map{
 		"list": list,
@@ -113,7 +117,8 @@ func getUserFollowers(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[USERS]GET: request for followers of %s\n", username)
+	logger := logging.Get()
+	logger.Info("[USERS]GET: request for followers of %s\n", username)
 	c.Status(fiber.StatusOK)
 	return c.JSON(fiber.Map{
 		"list": list,
@@ -146,7 +151,8 @@ func follow(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[USERS]FOLLOW: %s follows %s\n", username, target)
+	logger := logging.Get()
+	logger.Info("[USERS]FOLLOW: %s follows %s\n", username, target)
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -176,6 +182,7 @@ func unfollow(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[USERS]UNFOLLOW: %s unfollows %s\n", username, target)
+	logger := logging.Get()
+	logger.Info("[USERS]UNFOLLOW: %s unfollows %s\n", username, target)
 	return c.SendStatus(fiber.StatusOK)
 }

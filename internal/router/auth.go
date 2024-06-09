@@ -1,11 +1,11 @@
 package router
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/kidommoc/gustrody/internal/auth"
 	"github.com/kidommoc/gustrody/internal/database"
+	"github.com/kidommoc/gustrody/internal/logging"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -47,7 +47,6 @@ func mAuth(c *fiber.Ctx) error {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
-	fmt.Printf("[AUTH]mAuth: %s at session %s\n", username, session)
 
 	c.Locals("username", username)
 	oauth := auth.NewOauth(username, session)
@@ -66,7 +65,6 @@ func login(c *fiber.Ctx) error {
 	if err := c.BodyParser(body); err != nil {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	fmt.Printf("[AUTH]LOGIN: username \"%s\", password \"%s\"\n", body.Username, body.Password)
 
 	db := database.AuthInstance()
 	authService := auth.NewService(db)
@@ -83,7 +81,8 @@ func login(c *fiber.Ctx) error {
 		}
 	}
 
-	fmt.Printf("[AUTH]LOGIN: succeed. session: %s\n", session)
+	logger := logging.Get()
+	logger.Info("[AUTH]LOGIN: succeed. session: %s\n", session)
 	c.Status(fiber.StatusOK)
 	return c.JSON(fiber.Map{
 		"session": session,

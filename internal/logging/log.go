@@ -124,7 +124,11 @@ func (l *Logger) update() {
 
 	// open new logfile
 	l.date = date
-	path := l.path + "_" + date
+	path := l.path
+	switch l.split {
+	case split_date:
+		path = path + "_" + date
+	}
 	var e error
 	l.logfile, e = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, fs.ModePerm)
 	if e != nil {
@@ -181,12 +185,12 @@ func handleAttrs(attrs ...any) []any {
 	return attrs
 }
 
-func (l *Logger) LogDebug(msg string, attach ...any) {
+func (l *Logger) Debug(msg string, attach ...any) {
 	// shell
 	l.shellLogger.Debug(msg, handleAttrs(attach...)...)
 }
 
-func (l *Logger) LogInfo(msg string, attach ...any) {
+func (l *Logger) Info(msg string, attach ...any) {
 	if l.level <= level_info { // file
 		l.update()
 		l.fileLogger.Info(msg, handleAttrs(attach...)...)
@@ -195,7 +199,7 @@ func (l *Logger) LogInfo(msg string, attach ...any) {
 	}
 }
 
-func (l *Logger) LogWarning(msg string, attach ...any) {
+func (l *Logger) Warning(msg string, attach ...any) {
 	if l.level <= level_warning {
 		l.update()
 		l.fileLogger.Warn(msg, handleAttrs(attach...)...)
@@ -204,7 +208,7 @@ func (l *Logger) LogWarning(msg string, attach ...any) {
 	}
 }
 
-func (l *Logger) LogError(msg string, err utils.Err) {
+func (l *Logger) Error(msg string, err utils.Err) {
 	if l.level <= level_error {
 		l.update()
 		l.fileLogger.Error(msg,
