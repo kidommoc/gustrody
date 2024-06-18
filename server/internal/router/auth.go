@@ -2,61 +2,64 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kidommoc/gustrody/internal/auth"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
-
-	"github.com/gofiber/fiber/v2"
 )
 
-func routeAuth(router fiber.Router) {
-	router.Post("/login", login)
-	router.Post("/token", mAuth, func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
+func routeAuth(router *gin.RouterGroup) {
+	router.POST("/login", login)
+	router.POST("/token", mAuth, func(c *gin.Context) {
+		c.Status(http.StatusOK)
 	})
 }
 
-func mAuth(c *fiber.Ctx) error {
-	session := c.Get("Session")
-	authroization := c.Get("Authorization")
+func mAuth(c *gin.Context) {
+	session := c.Request.Header.Get("Session")
+	authroization := c.Request.Header.Get("Authorization")
 	if session == "" || authroization == "" {
-		c.Status(fiber.StatusUnauthorized)
-		return c.SendString("Missing HTTP header: Session and/or Authorization")
+		c.String(http.StatusUnauthorized, "Missing HTTP header: Session and/or Authorization")
+		return
 	}
 	// parse bearer to token
 	bearer := strings.Split(authroization, " ")
 	if len(bearer) != 2 || bearer[0] != "Bearer" {
-		c.Status(fiber.StatusUnauthorized)
-		return c.SendString("Invalid header: Authorization.\nShould be Bearer token in JWT.")
+		c.String(http.StatusUnauthorized, "Invalid header: Authorization.\nShould be Bearer token in JWT.")
+		return
 	}
 
 	db := models.AuthInstance()
 	authService := auth.NewService(db)
 	username, err := authService.VerifyToken(bearer[1], session)
 	if err != nil {
-		c.Status(fiber.StatusUnauthorized)
 		switch err.Code() {
 		case auth.ErrExpired:
-			return c.SendString("Token expired.")
+			c.String(http.StatusUnauthorized, "Token expired.")
+			return
 		case auth.ErrInvalid:
-			return c.SendString("Invalid token.")
+			c.String(http.StatusUnauthorized, "Invalid token.")
+			return
 		case auth.ErrWrongSession:
-			return c.SendString("Session can't match.")
+			c.String(http.StatusUnauthorized, "Session can't match.")
+			return
 		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
+			c.Status(http.StatusInternalServerError)
+			return
 		}
 	}
 
-	c.Locals("username", username)
+	c.Set("username", username)
 	oauth := auth.NewOauth(username, session)
 	c.Set("Token", oauth.Token)
 	c.Set("Refresh", oauth.Refresh)
 	// logger := logging.Get()
 	// msg := fmt.Sprintf("[AUTH]MAUTH: %s at session %s", username, session)
 	// logger.Info(msg)
-	return c.Next()
+	c.Next()
 }
 
 type loginBody struct {
@@ -64,32 +67,33 @@ type loginBody struct {
 	Password string `json:"password"`
 }
 
-func login(c *fiber.Ctx) error {
+func login(c *gin.Context) {
 	body := new(loginBody)
-	if err := c.BodyParser(body); err != nil {
-		return c.SendStatus(fiber.StatusBadRequest)
+	if err := c.ShouldBind(&body); err != nil {
+		c.Status(http.StatusBadRequest)
+		return
 	}
 
 	db := models.AuthInstance()
 	authService := auth.NewService(db)
 	session, oauth, err := authService.Login(body.Username, body.Password)
 	if err != nil {
-		c.Status(fiber.StatusUnauthorized)
 		switch err.Code() {
 		case auth.ErrUserNotFound:
-			return c.SendString("User not found.")
+			c.String(http.StatusUnauthorized, "User not found.")
 		case auth.ErrWrongPassword:
-			return c.SendString("Incorrect password.")
+			c.String(http.StatusUnauthorized, "Incorrect password.")
+			return
 		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
+			c.Status(http.StatusInternalServerError)
+			return
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[AUTH]LOGIN: %s succeed. session: %s", body.Username, session)
 	logger.Info(msg)
-	c.Status(fiber.StatusOK)
-	return c.JSON(fiber.Map{
+	c.JSON(http.StatusOK, gin.H{
 		"session": session,
 		"token":   oauth.Token,
 		"refresh": oauth.Refresh,

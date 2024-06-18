@@ -1,14 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/router"
-
-	"fmt"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
@@ -16,9 +15,13 @@ func main() {
 	db.Init()
 	models.Init()
 
-	app := fiber.New()
-	router.Route(app)
+	router := router.Router()
+	srv := &http.Server{
+		Addr:    ":8000",
+		Handler: router,
+	}
 
-	// addr := fmt.Sprintf(":%d", cfg.Port)
-	fmt.Println(app.Listen(":8000"))
+	if err := srv.ListenAndServe(); err != nil {
+		fmt.Errorf("Server shutdown... %s", err.Error())
+	}
 }

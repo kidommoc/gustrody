@@ -1,23 +1,25 @@
 package router
 
-import (
-	"github.com/gofiber/fiber/v2"
-)
+import "github.com/gin-gonic/gin"
 
-func Route(app *fiber.App) {
+func Router() *gin.Engine {
+	router := gin.Default()
+
 	// ==========================
 	// should route web page here
 	// ==========================
 
-	// api router
-	app.Use("/", func(c *fiber.Ctx) error {
-		c.Accepts("application/json")
-		return c.Next()
+	// non-json here
+
+	router.Use(func(c *gin.Context) {
+		c.SetAccepted("application/json")
+		c.Next()
 	})
-	routeAuth(app.Group("/auth"))
-	routeUsers(app.Group("/users"))
-	routePosts(app.Group("/posts"))
-	app.Use("/", func(c *fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusNotFound)
-	})
+	routeAuth(router.Group("/auth"))
+	routeUsers(router.Group("/users"))
+	routePosts(router.Group("/posts"))
+
+	// 404 here
+
+	return router
 }
