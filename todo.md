@@ -1,16 +1,14 @@
-# Milestone
-
+- [x] api
+- [x] system design
+- [x] authorization
+- [x] function: basic
+- [x] database (main and cache)
+- [x] logging
+- [ ] function: media: image
+- [ ] function: account
 - [ ] protocol
-- [ ] api
-- [ ] database (main and cache)
-- [ ] system design
-- [ ] authorization
-- [ ] logging
+- [ ] function: tags in posts
+- [ ] concurrency
+- [ ] function: fanout
+- [ ] function: notification
 - [ ] containerize
-
-# Function
-
-- [ ] basic
-- [ ] media: image
-- [ ] tags in posts
-- [ ] user settings
