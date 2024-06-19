@@ -2,30 +2,29 @@ package router
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/posts"
 	"github.com/kidommoc/gustrody/internal/users"
 )
 
-func routeUsers(router *gin.RouterGroup) {
-	router.GET("/:username", getUserProfile)
-	router.GET("/:username/posts", getUserPosts)
-	router.GET("/:username/followings", getUserFollowings)
-	router.GET("/:username/followers", getUserFollowers)
-	router.PUT("/follow/:username", mAuth, follow)
-	router.DELETE("/follow/:username", mAuth, unfollow)
+func routeUsers(router fiber.Router) {
+	router.Get("/:username", getUserProfile)
+	router.Get("/:username/posts", getUserPosts)
+	router.Get("/:username/followings", getUserFollowings)
+	router.Get("/:username/followers", getUserFollowers)
+	router.Put("/follow/:username", mAuth, follow)
+	router.Delete("/follow/:username", mAuth, unfollow)
 }
 
-func getUserProfile(c *gin.Context) {
-	username := c.Param("username")
+func getUserProfile(c *fiber.Ctx) error {
+	username := c.Params("username")
 	if username == "" {
-		c.String(http.StatusBadRequest, "Acquire username")
-		return
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
 	}
 
 	userService := users.NewService(models.UserInstance())
@@ -33,24 +32,25 @@ func getUserProfile(c *gin.Context) {
 	if err != nil {
 		switch err.Code() {
 		case users.ErrNotFound:
-			c.String(http.StatusNotFound, "User not found.")
-			return
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("User not found.")
 		default:
-			c.Status(http.StatusInternalServerError)
-			return
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[USERS]GET: request for %s", username)
 	logger.Info(msg)
-	c.JSON(http.StatusOK, profile)
+	c.Status(fiber.StatusOK)
+	return c.JSON(profile)
 }
 
-func getUserPosts(c *gin.Context) {
-	username := c.Param("username")
+func getUserPosts(c *fiber.Ctx) error {
+	username := c.Params("username")
 	if username == "" {
-		c.String(http.StatusBadRequest, "Acquire username")
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
 	}
 
 	userService := users.NewService(models.UserInstance())
@@ -59,24 +59,25 @@ func getUserPosts(c *gin.Context) {
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:
-			c.String(http.StatusNotFound, "User not found.")
-			return
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("User not found.")
 		default:
-			c.Status(http.StatusInternalServerError)
-			return
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[USERS]GET: request for posts of %s", username)
 	logger.Info(msg)
-	c.JSON(http.StatusOK, list)
+	c.Status(fiber.StatusOK)
+	return c.JSON(list)
 }
 
-func getUserFollowings(c *gin.Context) {
-	username := c.Param("username")
+func getUserFollowings(c *fiber.Ctx) error {
+	username := c.Params("username")
 	if username == "" {
-		c.String(http.StatusBadRequest, "Acquire username")
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
 	}
 
 	userService := users.NewService(models.UserInstance())
@@ -84,26 +85,27 @@ func getUserFollowings(c *gin.Context) {
 	if err != nil {
 		switch err.Code() {
 		case users.ErrNotFound:
-			c.String(http.StatusNotFound, "User not found.")
-			return
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("User not found.")
 		default:
-			c.Status(http.StatusInternalServerError)
-			return
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[USERS]GET: request for followings of %s", username)
 	logger.Info(msg)
-	c.JSON(http.StatusOK, gin.H{
+	c.Status(fiber.StatusOK)
+	return c.JSON(fiber.Map{
 		"list": list,
 	})
 }
 
-func getUserFollowers(c *gin.Context) {
-	username := c.Param("username")
+func getUserFollowers(c *fiber.Ctx) error {
+	username := c.Params("username")
 	if username == "" {
-		c.String(http.StatusBadRequest, "Acquire username")
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire username")
 	}
 
 	userService := users.NewService(models.UserInstance())
@@ -111,38 +113,31 @@ func getUserFollowers(c *gin.Context) {
 	if err != nil {
 		switch err.Code() {
 		case users.ErrNotFound:
-			c.String(http.StatusNotFound, "User not found.")
-			return
+			c.Status(fiber.StatusNotFound)
+			return c.SendString("User not found.")
 		default:
-			c.Status(http.StatusInternalServerError)
-			return
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[USERS]GET: request for followers of %s", username)
 	logger.Info(msg)
-	c.JSON(http.StatusOK, gin.H{
+	c.Status(fiber.StatusOK)
+	return c.JSON(fiber.Map{
 		"list": list,
 	})
 }
 
-func follow(c *gin.Context) {
-	target := c.Param("username")
+func follow(c *fiber.Ctx) error {
+	target := c.Params("username")
 	if target == "" {
-		c.String(http.StatusBadRequest, "Acquire target username")
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire target username")
 	}
-
-	var username string
-	if u, ok := c.Get("username"); !ok {
-		c.Status(http.StatusUnauthorized)
-		return
-	} else {
-		username, ok = u.(string)
-		if !ok {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
 	userService := users.NewService(models.UserInstance())
@@ -150,38 +145,31 @@ func follow(c *gin.Context) {
 	if err != nil {
 		switch err.Code() {
 		case users.ErrSelfFollow:
-			c.String(http.StatusBadRequest, "Try to self-follow")
-			return
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Try to self-follow")
 		case users.ErrNotFound:
-			c.String(http.StatusNotFound, fmt.Sprintf("User not found: %s", err.Error()))
-			return
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(fmt.Sprintf("User not found: %s", err.Error()))
 		default:
-			c.Status(http.StatusInternalServerError)
-			return
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[USERS]FOLLOW: %s follows %s", username, target)
 	logger.Info(msg)
-	c.Status(http.StatusOK)
+	return c.SendStatus(fiber.StatusOK)
 }
 
-func unfollow(c *gin.Context) {
-	target := c.Param("username")
+func unfollow(c *fiber.Ctx) error {
+	target := c.Params("username")
 	if target == "" {
-		c.String(http.StatusBadRequest, "Acquire target username")
+		c.Status(fiber.StatusBadRequest)
+		c.SendString("Acquire target username")
 	}
-	var username string
-	if u, ok := c.Get("username"); !ok {
-		c.Status(http.StatusUnauthorized)
-		return
-	} else {
-		username, ok = u.(string)
-		if !ok {
-			c.Status(http.StatusInternalServerError)
-			return
-		}
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
 	userService := users.NewService(models.UserInstance())
@@ -189,19 +177,18 @@ func unfollow(c *gin.Context) {
 	if err != nil {
 		switch err.Code() {
 		case users.ErrSelfFollow:
-			c.String(http.StatusBadRequest, "Try to self-unfollow")
-			return
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Try to self-unfollow")
 		case users.ErrNotFound:
-			c.String(http.StatusNotFound, fmt.Sprintf("User not found: %s", err.Error()))
-			return
+			c.Status(fiber.StatusNotFound)
+			return c.SendString(fmt.Sprintf("User not found: %s", err.Error()))
 		default:
-			c.Status(http.StatusInternalServerError)
-			return
+			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 	}
 
 	logger := logging.Get()
 	msg := fmt.Sprintf("[USERS]UNFOLLOW: %s unfollows %s", username, target)
 	logger.Info(msg)
-	c.Status(http.StatusOK)
+	return c.SendStatus(fiber.StatusOK)
 }

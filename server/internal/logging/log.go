@@ -223,14 +223,22 @@ func (l *Logger) Warning(msg string, attach ...any) {
 func (l *Logger) Error(msg string, err utils.Error) {
 	if l.level <= level_error {
 		l.update()
-		l.fileLogger.Error(msg,
-			slog.String("code", err.CodeString()),
-			slog.String("msg", err.Error()),
-		)
+		if err == nil {
+			l.fileLogger.Error(msg)
+		} else {
+			l.fileLogger.Error(msg,
+				slog.String("code", err.CodeString()),
+				slog.String("msg", err.Error()),
+			)
+		}
 	} else {
-		l.shellLogger.Error(msg,
-			slog.String("code", err.CodeString()),
-			slog.String("msg", err.Error()),
-		)
+		if err == nil {
+			l.shellLogger.Error(msg)
+		} else {
+			l.shellLogger.Error(msg,
+				slog.String("code", err.CodeString()),
+				slog.String("msg", err.Error()),
+			)
+		}
 	}
 }
