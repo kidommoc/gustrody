@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/joho/godotenv"
+	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 func loadEnv() {
@@ -46,6 +47,7 @@ func loadEnv() {
 		logfile = "./logging.log"
 	}
 	config.Logfile = logfile
+	utils.EnsureDirs(logfile, false)
 
 	// how to split logfile. default: 0(none)
 	logSplit, e := strconv.Atoi(envmap["LOG_SPLIT"])
@@ -68,8 +70,8 @@ func loadEnv() {
 	}
 	config.PqUser = pqUser
 
-	secret_paths[db_main] = envmap["POSTGRES_SECRET_PATH"]
-	secret_paths[db_redis] = envmap["REDIS_SECRET_PATH"]
+	secret_paths[db_main] = utils.TrimPath(envmap["POSTGRES_SECRET_PATH"])
+	secret_paths[db_redis] = utils.TrimPath(envmap["REDIS_SECRET_PATH"])
 
 	if len(secrets) == 0 {
 		loadSecrets()
@@ -77,6 +79,14 @@ func loadEnv() {
 
 	config.PqSecret = secrets[db_main]
 	config.RdSecret = secrets[db_redis]
+
+	// directory of user-uploaded images
+	imgDir := utils.TrimPath(envmap["IMAGES_DIR"])
+	if imgDir == "" {
+		imgDir = "./data/imgs"
+	}
+	config.ImgDir = imgDir
+	utils.EnsureDirs(imgDir, true)
 
 	// max content length. default: 500
 	mcl, err := strconv.Atoi(envmap["MAX_CONTENT_LENGTH"])

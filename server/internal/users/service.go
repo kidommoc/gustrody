@@ -24,10 +24,10 @@ type UserProfile struct {
 
 type UserService struct {
 	site string
-	db   models.IUsersDb
+	db   models.IUserDb
 }
 
-func NewService(db models.IUsersDb, c ...config.Config) *UserService {
+func NewService(db models.IUserDb, c ...config.Config) *UserService {
 	var cfg config.Config
 	if len(c) == 0 {
 		cfg = config.Get()

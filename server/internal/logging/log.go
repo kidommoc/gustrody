@@ -144,9 +144,8 @@ func (l *Logger) update() {
 	var e error
 	l.logfile, e = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, fs.ModePerm)
 	if e != nil {
-		msg := fmt.Sprintf("Cannot open logfile \"%s\"", path)
-		l.shellLogger.Error(msg, "error", e)
-		// end program?
+		msg := fmt.Sprintf("Cannot open logfile \"%s\":\n%s", path, e.Error())
+		panic(msg)
 	}
 
 	// update fileLogger

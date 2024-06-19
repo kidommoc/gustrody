@@ -9,6 +9,8 @@ func Route(app *fiber.App) {
 	// should route web page here
 	// ==========================
 
+	routeFiles(app.Group("/"))
+
 	// api router
 	app.Use("/", func(c *fiber.Ctx) error {
 		c.Accepts("application/json")

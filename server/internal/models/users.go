@@ -23,7 +23,7 @@ type follow struct {
 
 // db
 
-type IUsersDb interface {
+type IUserDb interface {
 	IsUserExist(username string) bool
 	QueryUser(username string) (user User, err utils.Error)
 	QueryUserFollowInfo(username string) (follows int64, followed int64, err utils.Error)

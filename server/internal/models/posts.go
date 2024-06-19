@@ -34,7 +34,6 @@ type IPostDb interface {
 	QueryPostByID(id string) (post Post, err utils.Error)
 	QueryPostReplies(id string) (replyings []*Post, replies []*Post, err utils.Error)
 	QueryPostsAndSharesByUser(user string, asec bool) (list []*Post, err utils.Error)
-	// QuerySharesByUser(user string, asec bool) (list []*Post, err utils.Error)
 	SetPost(id string, user string, replying string, content string) utils.Error
 	UpdatePost(id string, content string) utils.Error
 	RemovePost(id string) utils.Error
@@ -46,7 +45,6 @@ type IPostDb interface {
 	RemoveShare(user string, id string) utils.Error
 }
 
-// should implemented with Postgre
 type PostDb struct {
 	pool *_db.ConnPool[*_db.PqConn]
 }

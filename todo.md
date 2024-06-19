@@ -2,13 +2,13 @@
 - [x] system design
 - [x] authorization
 - [x] function: basic
-- [x] database (main and cache)
 - [x] logging
-- [ ] function: media: image
+- [x] database (main and cache) ***
+- [x] function: media: image
 - [ ] function: account
-- [ ] protocol
-- [ ] function: tags in posts
-- [ ] concurrency
-- [ ] function: fanout
-- [ ] function: notification
+- [ ] federalize ***
+- [ ] function: mentions in posts
+- [ ] concurrency **
+- [ ] function: fanout ***
+- [ ] function: notification **
 - [ ] containerize

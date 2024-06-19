@@ -16,6 +16,9 @@ type Config struct {
 	PqSecret string `json:"pqSecret"`
 	RdSecret string `json:"rdSecret"`
 
+	// static files
+	ImgDir string `json:"imgDir"`
+
 	// perference
 	MaxContentLength int `json:"maxCotentLength"`
 }
