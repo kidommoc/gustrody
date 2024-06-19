@@ -16,6 +16,7 @@ type Post struct {
 	Content     string          `json:"content"`
 	Likes       int64           `json:"likes"`
 	Shares      int64           `json:"shares"`
+	Attachments []string        `json:"attachments"`
 	Replyings   []*Post         `json:"replyings,omitempty"`
 	Replies     []*Post         `json:"replies,omitempty"`
 }

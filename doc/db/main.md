@@ -143,8 +143,9 @@ CREATE TABLE IF NOT EXISTS posts (
     "date" timestamp NOT NULL,
     "replying" text,
     "content" text,
-    "likes" text[],
-    "shares" text[]
+    "media" text[4] DEFAULT array[4]::text[4],
+    "likes" text[] DEFAULT array[]::text[],
+    "shares" text[] DEFAULT array[]::text[]
 );
 
 CREATE INDEX posters ON posts ("user");
@@ -159,11 +160,13 @@ CREATE INDEX posters ON posts ("user");
 ```sql
 INSERT INTO posts(
   "id", "user", "date",
-  "replying", "content"
+  "replying", "content",
+  "media"
 )
 VALUES (
   ${postID}, ${username}, NOW(),
-  ${replying}, ${content}
+  ${replying}, ${content},
+  ARRAY[${mediaUrl}, ...]
 );
 ```
 
@@ -171,7 +174,9 @@ VALUES (
 
 ```sql
 UPDATE posts
-SET "content" = ${content}, "date" = NOW()
+SET
+  "content" = ${content}, "date" = NOW(),
+  "media" = ARRAY[${mediaUrl}, ...]
 WHERE "id" = ${postID};
 ```
 
@@ -187,7 +192,7 @@ WHERE "id" = ${postID};
 ```sql
 -- QUERY post
 SELECT
-  "id", "user", "date", "content",
+  "id", "user", "date", "content", "media",
   CARDINALITY("likes") as "likes",
   CARDINALITY("shares") as "shares"
 FROM posts
@@ -204,10 +209,10 @@ WITH RECURSIVE rt AS (
 )
 SELECT
   posts."id", posts."user", posts."date",
-  posts."content", posts."replying",
+  posts."content", posts."media",
   CARDINALITY(posts."likes") as "likes",
   CARDINALITY(posts."shares") as "shares",
-  rt."level"
+  posts."replying", rt."level"
 FROM posts
   JOIN rt ON posts."id" = rt."id"
 ORDER BY "level" ASC, "date" DESC;
@@ -223,10 +228,10 @@ WITH RECURSIVE rs AS (
 )
 SELECT
   posts."id", posts."user", posts."date",
-  posts."content", posts."replying",
+  posts."content", posts."media",
   CARDINALITY(posts."likes") as "likes",
   CARDINALITY(posts."shares") as "shares",
-  rs."level"
+  posts."replying", rs."level"
 FROM posts
   JOIN rs ON posts."id" = rs."id"
 ORDER BY "level" ASC, "date" DESC;
@@ -241,7 +246,8 @@ ORDER BY "level" ASC, "date" DESC;
     WHERE p1."user" = ${username} AND p2."id" = p1."replying"
   )
   SELECT
-    posts."id", posts."user", posts."date", posts.content,
+    posts."id", posts."user", posts."date",
+    posts."content", posts."media",
     CARDINALITY("likes") as "likes",
     CARDINALITY("shares") as "shares",
     rr."user" AS "replyTo", NULL AS "sharedBy",
@@ -250,7 +256,7 @@ ORDER BY "level" ASC, "date" DESC;
   WHERE posts."user" = ${username} AND posts."id" = rr."id"
 UNION ALL
   SELECT
-    "id", "user", "date", "content",
+    "id", "user", "date", "content", "media",
     CARDINALITY("likes") as "likes",
     CARDINALITY("shares") as "shares",
     NULL AS "replyTo", NULL AS "sharedBy",
@@ -335,7 +341,8 @@ CREATE INDEX sharers ON shares ("user");
 
 ```sql
 SELECT
-  posts."id", posts."user", posts."date", posts."content",
+  posts."id", posts."user", posts."date",
+  posts."content", posts."media",
   CARDINALITY("likes") as "likes",
   CARDINALITY("shares") as "shares",
   NULL AS "replyTo", shares."user" as "sharedBy",

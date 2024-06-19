@@ -8,7 +8,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func (service *PostService) Reply(username string, postID string, content string) utils.Error {
+func (service *PostService) Reply(username string, postID string, content string, attachments []string) utils.Error {
 	postID = service.fullID(postID)
 	if !service.user.IsUserExist(username) {
 		return newErr(ErrUserNotFound, username)
@@ -24,7 +24,7 @@ func (service *PostService) Reply(username string, postID string, content string
 	for service.db.IsPostExist(id) {
 		id = service.newID()
 	}
-	if e := service.db.SetPost(id, username, postID, content); e != nil {
+	if e := service.db.SetPost(id, username, postID, content, attachments); e != nil {
 		switch {
 		case e.Code() == models.ErrNotFound && e.Error() == "post":
 			return newErr(ErrPostNotFound, postID)

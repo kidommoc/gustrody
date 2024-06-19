@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/logging"
@@ -141,8 +140,7 @@ func follow(c *fiber.Ctx) error {
 	}
 
 	userService := users.NewService(models.UserInstance())
-	err := userService.Follow(strings.Clone(username), strings.Clone(target))
-	if err != nil {
+	if err := userService.Follow(username, target); err != nil {
 		switch err.Code() {
 		case users.ErrSelfFollow:
 			c.Status(fiber.StatusBadRequest)
@@ -173,8 +171,7 @@ func unfollow(c *fiber.Ctx) error {
 	}
 
 	userService := users.NewService(models.UserInstance())
-	err := userService.Unfollow(strings.Clone(username), strings.Clone(target))
-	if err != nil {
+	if err := userService.Unfollow(username, target); err != nil {
 		switch err.Code() {
 		case users.ErrSelfFollow:
 			c.Status(fiber.StatusBadRequest)

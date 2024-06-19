@@ -32,6 +32,7 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 		Content:     p.Content,
 		Likes:       p.Likes,
 		Shares:      p.Shares,
+		Attachments: p.Media,
 	}
 
 	return post, nil
@@ -112,7 +113,7 @@ func (service *PostService) GetByUser(username string) (list []*Post, err utils.
 	return list, nil
 }
 
-func (service *PostService) New(username string, content string) utils.Error {
+func (service *PostService) New(username string, content string, attachments []string) utils.Error {
 	logger := logging.Get()
 	if !service.user.IsUserExist(username) {
 		return newErr(ErrUserNotFound, username)
@@ -129,7 +130,7 @@ func (service *PostService) New(username string, content string) utils.Error {
 		id = service.newID()
 	}
 
-	if e := service.db.SetPost(id, username, "", content); e != nil {
+	if e := service.db.SetPost(id, username, "", content, attachments); e != nil {
 		logger.Error("[Post] Cannot set post", e)
 		return newErr(ErrInternal, e.CodeString()+" "+e.Error())
 	}
@@ -137,7 +138,7 @@ func (service *PostService) New(username string, content string) utils.Error {
 	return nil
 }
 
-func (service *PostService) Edit(username string, postID string, content string) utils.Error {
+func (service *PostService) Edit(username string, postID string, content string, attachments []string) utils.Error {
 	if content == "" {
 		return newErr(ErrContent, "empty")
 	}
@@ -158,7 +159,7 @@ func (service *PostService) Edit(username string, postID string, content string)
 		return newErr(ErrOwner, "not "+username)
 	}
 
-	if e := service.db.UpdatePost(postID, content); e != nil {
+	if e := service.db.UpdatePost(postID, content, attachments); e != nil {
 		switch {
 		// default:
 		}

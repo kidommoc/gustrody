@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_db "github.com/kidommoc/gustrody/internal/db"
@@ -18,11 +19,12 @@ type Post struct {
 	User     string    `json:"user"`
 	Date     time.Time `json:"date"`
 	Content  string    `json:"content"`
-	Likes    int64     `json:"likes"`    // count
-	Shares   int64     `json:"shares"`   // count
-	ReplyTo  string    `json:"replyTo"`  // user id
-	SharedBy string    `json:"sharedBy"` // user id
+	Media    []string  `json:"media"`    // attached media url
 	Replying string    `json:"replying"` // post id
+	ReplyTo  string    `json:"replyTo"`  // user id, temporary field
+	SharedBy string    `json:"sharedBy"` // user id, temporary field
+	Likes    int64     `json:"likes"`    // count, temporary field
+	Shares   int64     `json:"shares"`   // count, temporary field
 	ActDate  string    `json:"actDate"`  // temporary field, used in sort
 	Level    int       `json:"level"`    // temporary field, used in replying and replies
 }
@@ -34,8 +36,8 @@ type IPostDb interface {
 	QueryPostByID(id string) (post Post, err utils.Error)
 	QueryPostReplies(id string) (replyings []*Post, replies []*Post, err utils.Error)
 	QueryPostsAndSharesByUser(user string, asec bool) (list []*Post, err utils.Error)
-	SetPost(id string, user string, replying string, content string) utils.Error
-	UpdatePost(id string, content string) utils.Error
+	SetPost(id string, user string, replying string, content string, attachments []string) utils.Error
+	UpdatePost(id string, content string, attachments []string) utils.Error
 	RemovePost(id string) utils.Error
 	QueryLikes(id string) (list []string, err utils.Error)
 	SetLike(user string, id string) utils.Error
@@ -61,6 +63,17 @@ func PostInstance() *PostDb {
 }
 
 // functions
+
+func insertArray(q string, l int, start int) string {
+	if l == 0 {
+		return fmt.Sprintf(q, "NULL")
+	}
+	s := make([]string, 0, l)
+	for i := 0; i < l; i += 1 {
+		s = append(s, fmt.Sprintf("$%d", i+start))
+	}
+	return fmt.Sprintf(q, fmt.Sprintf("ARRAY[%s]", strings.Join(s, ", ")))
+}
 
 func (db *PostDb) IsPostExist(id string) bool {
 	logger := logging.Get()
@@ -102,15 +115,16 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err utils.Error) {
 	defer conn.Close()
 
 	qs := `SELECT
-		     "id", "user", "date", "content",
+		     "id", "user", "date", "content", "media"
 		     CARDINALITY("likes") as "likes",
 		     CARDINALITY("shares") as "shares"
 		   FROM posts
 		   WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
 	post = Post{}
+	var media []string
 	if e := r.Scan(
-		&post.ID, &post.User, &post.Date, &post.Content,
+		&post.ID, &post.User, &post.Date, &post.Content, pq.Array(&media),
 		&post.Likes, &post.Shares,
 	); e != nil {
 		switch e {
@@ -122,6 +136,10 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err utils.Error) {
 			return post, err
 		}
 	}
+	if media == nil {
+		media = []string{}
+	}
+	post.Media = media
 	return post, nil
 }
 
@@ -151,10 +169,10 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 			)
 			SELECT
 			  posts."id", posts."user", posts."date",
-			  posts."content", posts."replying",
+			  posts."content", posts."media",
 			  CARDINALITY(posts."likes") as "likes",
 			  CARDINALITY(posts."shares") as "shares",
-			  rt."level"
+			  posts."replying", rt."level"
 			FROM posts
 			  JOIN rt ON posts."id" = rt."id"
 			ORDER BY "level" ASC, "date" DESC;
@@ -167,10 +185,12 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 	for r.Next() {
 		p := Post{}
 		var rpy sql.NullString
+		var media []string
 		if e := r.Scan(
 			&p.ID, &p.User, &p.Date,
-			&p.Content, &rpy,
-			&p.Likes, &p.Shares, &p.Level,
+			&p.Content, pq.Array(&media),
+			&p.Likes, &p.Shares,
+			&rpy, &p.Level,
 		); e != nil {
 			logger.Error("[Model.Reply] Cannot scan row", newErr(ErrDbInternal, e.Error()))
 			continue
@@ -178,6 +198,10 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		if rpy.Valid {
 			p.Replying = rpy.String
 		}
+		if media == nil {
+			media = []string{}
+		}
+		p.Media = media
 		replyings = append(replyings, &p)
 	}
 
@@ -191,10 +215,10 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 			)
 			SELECT
 			  posts."id", posts."user", posts."date",
-			  posts."content", posts."replying",
+			  posts."content", posts."media"
 			  CARDINALITY(posts."likes") as "likes",
 			  CARDINALITY(posts."shares") as "shares",
-			  rs."level"
+			  posts."replying", rs."level"
 			FROM posts
 			  JOIN rs ON posts."id" = rs."id"
 			ORDER BY "level" ASC, "date" DESC;
@@ -207,10 +231,12 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 	for r.Next() {
 		p := Post{}
 		var rpy sql.NullString
+		var media []string
 		if e := r.Scan(
 			&p.ID, &p.User, &p.Date,
-			&p.Content, &rpy,
-			&p.Likes, &p.Shares, &p.Level,
+			&p.Content, pq.Array(&media),
+			&p.Likes, &p.Shares,
+			&rpy, &p.Level,
 		); e != nil {
 			logger.Error("[Model.Reply] Cannot scan row", newErr(ErrDbInternal, e.Error()))
 			continue
@@ -218,6 +244,10 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		if rpy.Valid {
 			p.Replying = rpy.String
 		}
+		if media == nil {
+			media = []string{}
+		}
+		p.Media = media
 		replies = append(replies, &p)
 	}
 
@@ -242,7 +272,8 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 			    WHERE p1."user" = $1 AND p2."id" = p1."replying"
 			  )
 			  SELECT
-			    posts."id", posts."user", posts."date", posts.content,
+			    posts."id", posts."user", posts."date",
+				posts."content", posts."media",
 			    CARDINALITY("likes") as "likes",
 			    CARDINALITY("shares") as "shares",
 			    rr."user" AS "replyTo", NULL AS "sharedBy",
@@ -251,7 +282,7 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 			  WHERE posts."user" = $1 AND posts."id" = rr."id"
 			UNION ALL
 			  SELECT
-			    "id", "user", "date", "content",
+			    "id", "user", "date", "content", "media",
 			    CARDINALITY("likes") as "likes",
 			    CARDINALITY("shares") as "shares",
 			    NULL AS "replyTo", NULL AS "sharedBy",
@@ -260,7 +291,8 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 			  WHERE "user" = $1 AND "replying" IS NULL
 			UNION ALL
 			  SELECT
-			    posts."id", posts."user", posts."date", posts."content",
+			    posts."id", posts."user", posts."date",
+				posts."content", posts."media",
 			    CARDINALITY("likes") as "likes",
 			    CARDINALITY("shares") as "shares",
 			    NULL AS "replyTo", shares."user" as "sharedBy",
@@ -282,8 +314,9 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 		p := Post{}
 		var rpt sql.NullString
 		var shb sql.NullString
+		var media []string
 		if e := r.Scan(
-			&p.ID, &p.User, &p.Date, &p.Content,
+			&p.ID, &p.User, &p.Date, &p.Content, pq.Array(&media),
 			&p.Likes, &p.Shares,
 			&rpt, &shb, &p.ActDate,
 		); e != nil {
@@ -296,6 +329,10 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 		if shb.Valid {
 			p.SharedBy = shb.String
 		}
+		if media == nil {
+			media = []string{}
+		}
+		p.Media = media
 		list = append(list, &p)
 	}
 	return list, nil
@@ -305,7 +342,7 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 //
 //   - DbInternal
 //   - Dunplicate "post"
-func (db *PostDb) SetPost(id string, user string, replying string, content string) utils.Error {
+func (db *PostDb) SetPost(id string, user string, replying string, content string, attachments []string) utils.Error {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -319,19 +356,26 @@ func (db *PostDb) SetPost(id string, user string, replying string, content strin
 
 	qs := ` INSERT INTO posts(
 			  "id", "user", "date",
-			  "replying", "content"
+			  "replying", "content", "media"
 			)
 			VALUES (
 			  $1, $2, NOW(),
-			  $3, $4
+			  $3, $4, %s
 			);`
-	var r int64
-	var e error
+	qs = insertArray(qs, len(attachments), 5)
+	args := make([]interface{}, 0, 4+len(attachments))
+	args = append(args, id)
+	args = append(args, user)
 	if replying == "" {
-		r, e = conn.Exec(qs, id, user, nil, content)
+		args = append(args, nil)
 	} else {
-		r, e = conn.Exec(qs, id, user, replying, content)
+		args = append(args, replying)
 	}
+	args = append(args, content)
+	for _, v := range attachments {
+		args = append(args, v)
+	}
+	r, e := conn.Exec(qs, args...)
 	if e != nil {
 		return newErr(ErrDbInternal, e.Error())
 	}
@@ -345,7 +389,7 @@ func (db *PostDb) SetPost(id string, user string, replying string, content strin
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) UpdatePost(id string, content string) utils.Error {
+func (db *PostDb) UpdatePost(id string, content string, attachments []string) utils.Error {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -355,9 +399,18 @@ func (db *PostDb) UpdatePost(id string, content string) utils.Error {
 	defer conn.Close()
 
 	qs := ` UPDATE posts
-			SET "content" = $1, "date" = NOW()
+			SET
+			  "date" = NOW(), "content" = $1,
+			  "media" = %s
 			WHERE "id" = $2;`
-	r, e := conn.Exec(qs, content, id)
+	qs = insertArray(qs, len(attachments), 3)
+	args := make([]interface{}, 0, len(attachments))
+	args = append(args, content)
+	args = append(args, id)
+	for _, v := range attachments {
+		args = append(args, v)
+	}
+	r, e := conn.Exec(qs, args...)
 	if e != nil {
 		return newErr(ErrDbInternal, e.Error())
 	}
@@ -412,8 +465,7 @@ func (db *PostDb) QueryLikes(id string) (list []string, err utils.Error) {
 			FROM posts
 			WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
-	var ls []sql.NullString
-	if e := r.Scan(pq.Array(&ls)); e != nil {
+	if e := r.Scan(pq.Array(&list)); e != nil {
 		switch e {
 		case sql.ErrNoRows:
 			return nil, newErr(ErrNotFound, "post")
@@ -421,12 +473,6 @@ func (db *PostDb) QueryLikes(id string) (list []string, err utils.Error) {
 			err = newErr(ErrDbInternal, e.Error())
 			logger.Error("[Model.Like] Cannot scan row", err)
 			return nil, err
-		}
-	}
-	list = make([]string, 0, len(ls))
-	for _, v := range ls {
-		if v.Valid {
-			list = append(list, v.String)
 		}
 	}
 	return list, nil
@@ -507,8 +553,7 @@ func (db *PostDb) QueryShares(id string) (list []string, err utils.Error) {
 			FROM posts
 			WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
-	var ss []sql.NullString
-	if e := r.Scan(pq.Array(&ss)); e != nil {
+	if e := r.Scan(pq.Array(&list)); e != nil {
 		switch e {
 		case sql.ErrNoRows:
 			return nil, newErr(ErrNotFound)
@@ -516,12 +561,6 @@ func (db *PostDb) QueryShares(id string) (list []string, err utils.Error) {
 			err = newErr(ErrDbInternal, e.Error())
 			logger.Error("[Model.Like] Cannot scan row", err)
 			return nil, err
-		}
-	}
-	list = make([]string, 0, len(ss))
-	for _, v := range ss {
-		if v.Valid {
-			list = append(list, v.String)
 		}
 	}
 	return list, nil

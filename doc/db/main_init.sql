@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS posts (
     "date" timestamp NOT NULL,
     "replying" text,
     "content" text,
+    "media" text[] DEFAULT array[]::text[],
     "likes" text[] DEFAULT array[]::text[],
     "shares" text[] DEFAULT array[]::text[]
 );
