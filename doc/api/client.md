@@ -1,4 +1,4 @@
-# API Document
+# Client API Document
 
 ## Status Code
 
@@ -8,22 +8,45 @@
 - *404*: not found
 - *500*: server error
 
+## Shorthands
+
+```json
+"image" := {
+  "type": "image/jpeg or imag/png",
+  "url": "string(url)",
+  "alt": "string"
+}
+
+"user-info" := {
+  "id": "string(url)",
+  "username": "string",
+  "nickname": "string",
+  "avatar": "image"
+}
+
+"vsb" := "public" | "follower" | "direct"
+```
+
 ## Authentication and Authorization
 
 ### POST `/auth/login`
 
-SEND:
+Login to get oauth token.
+
+- REQUEST:
 
 ```json
+[HEADER]Content-Type: application/json
 {
   "username": "string",
   "password": "string(encrypted)"
 }
 ```
 
-RETURN: 200, 401, 500  
+- RESPONSE: 200, 401, 500  
 
 ```json
+[HEADER]Content-Type: application/json
 {
   "session": "string",
   "token": "string",
@@ -33,114 +56,218 @@ RETURN: 200, 401, 500
 
 ### POST `/auth/token`
 
-SEND:
+Refresh token.
 
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING REFRESH TOKEN IN HTTP HEADER: Authorization(Bearer)
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer REFRESH (REQUIRED)
 ```
 
-RETURN: 200, 401, 500  
+- RESPONSE: 200, 401, 500  
 
-```json
-HEADER: Token
-HEADER: Refresh
 ```
-
-## Timeline and Notification
-
-### GET `/home[?from=<?>]`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN:  
-
-```json
-NOT IMPLEMENTED
-```
-
-### GET `/public[?from=<?>]`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN:  
-
-```json
-NOT IMPLEMENTED
-```
-
-### GET `/notification[?from=<?>]`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN:  
-
-```json
-NOT IMPLEMENTED
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
 ## Users
 
-### GET `/users/<username>`
+### PUT `/users`
 
-RETURN: 200, 404, 500  
+Register new user.
+
+- REQUEST:
 
 ```json
+[HEADER]Content-Type: application/json
+{
+  "username": "string",
+  "nickname": "string",
+  "password": "string(encrypted)"
+}
+```
+
+- RESPONSE: 200, 400, 500
+
+### POST `/users/password`
+
+Edit *my* password.
+
+- REQUEST:
+
+```json
+[HEADER]Content-Type: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+{
+  "password": "string(encrypted)"
+}
+```
+
+- RESPONSE: 200, 400, 401, 500
+
+```
+[HEADER]Token:
+[HEADER]Refresh:
+```
+
+### GET `/users/profile`
+
+Get *my* profile to edit.
+
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE: 200, 401, 500
+
+```json
+[HEADER]Content-Type: application/json
+[HEADER]Token:
+[HEADER]Refresh:
+{
+  "nickname": "string",
+  "summary": "string",
+  "avatar": {
+  "type": "image/jpeg or imag/png",
+  "url": "string(url)"
+}
+}
+```
+
+### POST `/users/profile`
+
+Edit *my* profile.
+
+- REQUEST:
+
+```json
+[HEADER]Content-Type: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+{
+  "nickname": "string",
+  "summary": "string",
+  "avatar": {
+  "type": "image/jpeg or imag/png",
+  "url": "string(url)"
+}
+}
+```
+
+- RESPONSE: 200, 400, 401, 500
+
+```
+[HEADER]Token:
+[HEADER]Refresh:
+```
+
+### GET `/users/settings`
+
+Get *my* user settings to edit.
+
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE:
+
+```json
+[HEADER]Content-Type: application/json
+[HEADER]Token:
+[HEADER]Refresh:
+{
+  "locked": true,
+  "postVsb": "string(enum)",
+  "shareVsb": "string(enum)"
+}
+```
+
+### POST `/users/settings`
+
+Edit *my* user settings.
+
+- REQUEST
+
+```json
+[HEADER]Content-Type: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+{
+  "locked": true,
+  "postVsb": "string(enum)",
+  "shareVsb": "string(enum)"
+}
+```
+
+- RESPONSE: 200, 400, 401, 500
+
+### GET `/users/<username>`
+
+Get a user's profile.
+
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+```
+
+- RESPONSE: 200, 404, 500  
+
+```json
+[HEADER]Content-Type: application/json
 {
   "id": "string(url)",
-  "preferredUsername": "string",
-  "name": "string",
+  "username": "string",
+  "nickname": "string",
   "summary": "string",
-  "icon": "string(url)", // NOT IMPLEMENTED
+  "avatar": "image",
   "follows": "number(count)",
-  "followings": "string(url)",
   "followed": "number(count)",
-  "followers": "string(url)"
 }
 ```
 
 ### GET `/users/<username>/posts`
 
-SEND:
+- REQUEST:
 
-```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
-OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (OPTIONAL)
+[HEADER]Authorization: Bearer (OPTIONAL)
 ```
 
-RETURN: 200, 401, 403, 404, 500  
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```json
-// ONLY WHEN PROVIDED SESSION AND TOKEN
-HEADER: Token
-HEADER: Refresh
+[HEADER]Content-Type: application/json
+[HEADER]Token: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[HEADER]Refresh: (ONLY WHEN PROVIDED SESSION AND TOKEN)
 {
   "list": [
     {
       "id": "string(url)",
-      "publisher": {
-        "id": "string(url)",
-        "preferredUsername": "string",
-        "name": "string",
-        "icon": "string(url)" // NOT IMPLEMENETED
-      },
-      "publishedAt": "string(rfc3339)",
-      "content": "string"
+      // note: when the post is shared from others,
+      // "user" should be the publisher of content
+      // and "sharedBy" should be one shares it.
+      "user": "user-info",
+      "replyTo": "user-info", // may be null
+      "sharedBy": "user-info", // may be null
+      "date": "string(rfc3339)",
+      "content": "string",
+      "attachments": [
+        "image", ... // max 4
+      ]
     }, ...
   ]
 }
@@ -148,275 +275,412 @@ HEADER: Refresh
 
 ### GET `/users/<username>/followings`
 
-SEND:
+Get a user's following list.
 
-```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
-OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (OPTIONAL)
+[HEADER]Authorization: Bearer (OPTIONAL)
 ```
 
-RETURN: 200, 401, 403, 404, 500  
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```json
-// ONLY WHEN PROVIDED SESSION AND TOKEN
-HEADER: Token
-HEADER: Refresh
-{
-  "list": [
-    {
-      "id": "string(url)",
-      "preferredUsername": "string",
-      "name": "string",
-      "icon": "string(url)" // NOT IMPLEMENETED
-    }, ...
-  ]
-}
+[HEADER]Content-Type: application/json
+[HEADER]Token: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[HEADER]Refresh: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[
+  "user-info", ...
+]
 ```
 
 ### GET `/users/<username>/followers`
 
-SEND:
+Get a user's follower list.
+
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (OPTIONAL)
+[HEADER]Authorization: Bearer (OPTIONAL)
+```
+
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```json
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
-OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Content-Type: application/json
+[HEADER]Token: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[HEADER]Refresh: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[
+  "user-info", ...
+]
 ```
 
-RETURN: 200, 401, 403, 404, 500  
+### PUT `/users/<username>/follow`
 
-```json
-// ONLY WHEN PROVIDED SESSION AND TOKEN
-HEADER: Token
-HEADER: Refresh
-{
-  "list": [
-    {
-      "id": "string(url)",
-      "preferredUsername": "string",
-      "name": "string",
-      "icon": "string(url)" // NOT IMPLEMENETED
-    }, ...
-  ]
-}
-```
+Follow a user.
 
-### PUT `/users/follow/<username>`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN: 200, 401, 404, 500  
+- REQUEST:
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 ```
 
-### DELETE `/users/follow/<username>`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN: 200, 401, 404, 500  
+- RESPONSE: 200, 401, 404, 500  
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Token:
+[HEADER]Refresh:
+```
+
+### DELETE `/users/<username>/follow`
+
+Unfollow a user.
+
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE: 200, 401, 404, 500  
+
+```
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
 ## Posts
 
-### GET `/posts/<postId>`
+### GET `/posts/<postID>`
 
-SEND:
+Get a post.
+
+- REQUEST:
 
 ```
-OPTIONALLY PROVIDE SESSION IN HTTP HEADER: Session
-OPTIONALLY PROVIDE TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Accept: application/json
+[HEADER]Session: (OPTIONAL)
+[HEADER]Authorization: Bearer (OPTIONAL)
 ```
 
-RETURN: 200, 401, 403, 404, 500  
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```json
-// ONLY WHEN PROVIDED SESSION AND TOKEN
-HEADER: Token
-HEADER: Refresh
+[HEADER]Content-Type: application/json
+[HEADER]Token: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[HEADER]Refresh: (ONLY WHEN PROVIDED SESSION AND TOKEN)
 {
   "id": "string(url)",
-  "publisher": {
-    "id": "string(url)",
-    "preferredUsername": "string",
-    "name": "string",
-    "icon": "string(url)" // NOT IMPLEMENETED
-  },
-  "publishedAt": "string(rfc3339)",
-  "content": "string"
+  "user": "user-info",
+  "date": "string(rfc3339)",
+  "content": "string",
+  "attachments": [
+    "image", ... // max 4
+  ],
+  "replyings": [
+    // posts list
+  ],
+  "replies": [
+    // posts tree
+  ]
 }
 ```
 
 ### PUT `/posts`
 
-SEND:
+Post a new post.
+
+- REQUEST:
 
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Content-Type: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 {
-  "content": "string"
+  "visibility": "vsb",
+  "content": "string",
+  "attachments": [
+    "image", ... // max 4
+  ]
 }
 ```
 
-RETURN: 200, 401, 500  
+- RESPONSE: 200, 400, 401, 500  
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
-### PUT `/posts/reply/<postId>`
+### PUT `/posts/<postID>/reply`
 
-SEND:
+Reply a post.
+
+- REQUEST:
 
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Content-Type: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 {
-  "content": "string"
+  "content": "string",
+  "attachments": [
+    "image", ... // max 4
+  ]
 }
 ```
 
-RETURN: 200, 401, 404, 500  
+- RESPONSE: 200, 400, 401, 404, 500  
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
-### POST `/posts/<postId>`
+### POST `/posts/<postID>`
 
-SEND:
+Edit a post of *me*.
+
+- REQUEST:
 
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Content-Type: application/json
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 {
-  "content": "string"
+  "content": "string",
+  "attachments": [
+    "image", ... // max 4
+  ]
 }
 ```
 
-RETURN: 200, 401, 404, 500  
+- RESPONSE: 200, 400, 401, 404, 500  
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
-### DELETE `/posts/<postId>`
+### DELETE `/posts/<postID>`
 
-SEND:
+Remove a post of *me*.
+
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE: 200, 401, 404, 500  
+
+```
+[HEADER]Token:
+[HEADER]Refresh:
+```
+
+### GET `/posts/<postID>/likes`
+
+Get likes of a post.
+
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (OPTIONAL)
+[HEADER]Authorization: Bearer (OPTIONAL)
+```
+
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Content-Type: application/json
+[HEADER]Token: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[HEADER]Refresh: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[
+  "user-info", ...
+]
 ```
 
-RETURN: 200, 401, 404, 500  
+### PUT `/posts/<postID>/like`
+
+Like a post.
+
+- REQUEST:
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 ```
 
-### PUT `/posts/<postId>/like`
+- RESPONSE: 200, 401, 403, 404, 500  
 
-SEND:
+```
+[HEADER]Token:
+[HEADER]Refresh:
+```
+
+### DELETE `/posts/<postID>/like`
+
+Unlike a post.
+
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE: 200, 401, 403, 404, 500  
+
+```
+[HEADER]Token
+[HEADER]Refresh
+```
+
+### GET `/posts/<postID>/shares`
+
+Get shares of a post.
+
+- REQUEST:
+
+```
+[HEADER]Accept: application/json
+[HEADER]Session: (OPTIONAL)
+[HEADER]Authorization: Bearer (OPTIONAL)
+```
+
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
+[HEADER]Content-Type: application/json
+[HEADER]Token: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[HEADER]Refresh: (ONLY WHEN PROVIDED SESSION AND TOKEN)
+[
+  "user-info", ...
+]
 ```
 
-RETURN: 200, 401, 403, 404, 500  
+### PUT `/posts/<postID>/share`
+
+Share a post.
+
+- REQUEST:
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 ```
 
-### DELETE `/posts/<postId>/like`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN: 200, 401, 403, 404, 500  
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
-### PUT `/posts/<postId>/share`
+### DELETE `/posts/<postID>/share`
 
-SEND:
+Unshare a post.
 
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN: 200, 401, 403, 404, 500  
+- REQUEST:
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
 ```
 
-### DELETE `/posts/<postId>/share`
-
-SEND:
-
-```json
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-```
-
-RETURN: 200, 401, 403, 404, 500  
+- RESPONSE: 200, 401, 403, 404, 500  
 
 ```
-HEADER: Token
-HEADER: Refresh
+[HEADER]Token:
+[HEADER]Refresh:
 ```
 
 ## Files
 
 ### GET `/images/<filename>`
 
-RETURN: 200, 404, 500
+Get an image.
+
+- RESPONSE: 200, 404, 500
 
 ```
-FILE
+[HEADER]Content-Type: image/jpeg or image/png
 ```
 
 ### PUT `/images`
 
-SEND:
+Upload an image.
+
+- REQUEST:
 
 ```
-REQUIRE PROVIDING SESSION IN HTTP HEADER: Session
-REQUIRE PROVIDING TOKEN IN HTTP HEADER: Authorization(Bearer)
-FILE
+[HEADER]Content-Type: multipart/form-data
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+Form data...
 ```
 
-RETURN: 200, 401, 500  
+- RESPONSE: 200, 401, 500  
+
+```
+[HEADER]Content-Type: text/plain
+[HEADER]Token:
+[HEADER]Refresh:
+https://url.to/image
+```
+
+## Timeline and Notification
+
+### GET `/home[?from=<?>]`
+
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE:  
+
+```json
+NOT IMPLEMENTED
+```
+
+### GET `/public[?from=<?>]`
+
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE:  
+
+```json
+NOT IMPLEMENTED
+```
+
+### GET `/notification[?from=<?>]`
+
+- REQUEST:
+
+```
+[HEADER]Session: (REQUIRED)
+[HEADER]Authorization: Bearer (REQUIRED)
+```
+
+- RESPONSE:  
+
+```json
+NOT IMPLEMENTED
+```
