@@ -3,6 +3,7 @@
 ## Status Code
 
 - *200*: succeed
+- *400*: request 
 - *401*: require login / failed login
 - *403*: access not allowed
 - *404*: not found
@@ -135,9 +136,9 @@ Get *my* profile to edit.
   "nickname": "string",
   "summary": "string",
   "avatar": {
-  "type": "image/jpeg or imag/png",
-  "url": "string(url)"
-}
+    "type": "image/jpeg or imag/png",
+    "url": "string(url)"
+  }
 }
 ```
 
@@ -155,9 +156,9 @@ Edit *my* profile.
   "nickname": "string",
   "summary": "string",
   "avatar": {
-  "type": "image/jpeg or imag/png",
-  "url": "string(url)"
-}
+    "type": "image/jpeg or imag/png",
+    "url": "string(url)"
+  }
 }
 ```
 
@@ -568,7 +569,7 @@ Get shares of a post.
 ]
 ```
 
-### PUT `/posts/<postID>/share`
+### PUT `/posts/<postID>/share?visibility=<vsb>`
 
 Share a post.
 
@@ -631,11 +632,14 @@ Form data...
 
 - RESPONSE: 200, 401, 500  
 
-```
+```json
 [HEADER]Content-Type: text/plain
 [HEADER]Token:
 [HEADER]Refresh:
-https://url.to/image
+{
+  "type": "image/jpeg or image/png",
+  "url": "string(url)",
+}
 ```
 
 ## Timeline and Notification
