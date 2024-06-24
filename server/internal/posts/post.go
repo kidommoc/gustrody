@@ -1,6 +1,8 @@
 package posts
 
 import (
+	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -14,6 +16,7 @@ import (
 //
 //   - UserNotFound
 func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (post Post, err utils.Error) {
+	logger := logging.Get()
 	var u *users.UserInfo
 	if len(us) == 0 {
 		uu, e := service.user.GetInfo(p.User)
@@ -27,19 +30,46 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 
 	post = Post{
 		ID:          p.ID,
+		Url:         p.Url,
 		User:        u,
-		PublishedAt: p.Date.Format(time.RFC3339),
+		Date:        p.Date.Format(time.RFC3339),
+		Visibility:  string(p.Vsb),
 		Content:     p.Content,
 		Likes:       p.Likes,
 		Shares:      p.Shares,
-		Attachments: p.Media,
+		Attachments: make([]AttachImg, 0, len(p.Media)),
+	}
+
+	for _, v := range p.Media {
+		a := strings.Split(v.Url, ".")
+		if len(a) < 2 {
+			logger.Warning("[Post] Wrong image url: no extension",
+				"url", v.Url,
+			)
+			continue
+		}
+		img := AttachImg{
+			Url: v.Url,
+			Alt: v.Alt,
+		}
+		ext := a[len(a)-1]
+		switch ext {
+		case "jpeg":
+		case "png":
+			img.Type = "image/" + ext
+		default:
+			logger.Warning("[Post] Wrong image url: wrong extension",
+				"url", v.Url,
+			)
+			continue
+		}
+		post.Attachments = append(post.Attachments, img)
 	}
 
 	return post, nil
 }
 
-func (service *PostService) Get(postID string) (post Post, err utils.Error) {
-	postID = service.fullID(postID)
+func (service *PostService) Get(user string, postID string) (post Post, err utils.Error) {
 	result, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
@@ -47,6 +77,13 @@ func (service *PostService) Get(postID string) (post Post, err utils.Error) {
 			return post, newErr(ErrPostNotFound, postID)
 			// default:
 		}
+	}
+
+	if !service.checkPermission(user, result.User, result.ID, result.Vsb) {
+		return post, newErr(
+			ErrNotPermitted,
+			fmt.Sprintf("%s is not allowed to visit %s", user, postID),
+		)
 	}
 
 	post, e = service.makePost(&result)
@@ -62,20 +99,20 @@ func (service *PostService) Get(postID string) (post Post, err utils.Error) {
 	return post, nil
 }
 
-func (service *PostService) GetByUser(username string) (list []*Post, err utils.Error) {
-	user, e := service.user.GetInfo(username)
+func (service *PostService) GetByUser(username string, target string) (list []*Post, err utils.Error) {
+	user, e := service.user.GetInfo(target)
 	if e != nil {
 		switch {
 		case e.Code() == models.ErrNotFound && e.Error() == "user":
-			return list, newErr(ErrUserNotFound, username)
+			return list, newErr(ErrUserNotFound, target)
 			// default:
 		}
 	}
 	us := make(map[string]*users.UserInfo)
-	us[username] = &user
+	us[target] = &user
 
 	logger := logging.Get()
-	posts, e := service.db.QueryPostsAndSharesByUser(username, false) // descending by date
+	posts, e := service.db.QueryPostsAndSharesByUser(target, false) // descending by date
 	if e != nil {
 		logger.Error("[Posts] Error when GetByUser", e)
 		return list, nil
@@ -96,7 +133,18 @@ func (service *PostService) GetByUser(username string) (list []*Post, err utils.
 		us[u] = &ui
 		return &ui
 	}
+	fo_only := service.checkPermission(username, target, "", utils.Vsb_FOLLOWER)
 	for _, v := range posts {
+		switch v.Vsb {
+		case utils.Vsb_FOLLOWER:
+			if !fo_only {
+				continue
+			}
+		case utils.Vsb_DIRECT:
+			if !service.checkPermission(username, target, v.ID, v.Vsb) {
+				continue
+			}
+		}
 		u := gu(v.User)
 		if u == nil {
 			continue
@@ -113,7 +161,7 @@ func (service *PostService) GetByUser(username string) (list []*Post, err utils.
 	return list, nil
 }
 
-func (service *PostService) New(username string, content string, attachments []string) utils.Error {
+func (service *PostService) New(username string, vsb string, content string, attachments []AttachImg) utils.Error {
 	logger := logging.Get()
 	if !service.user.IsUserExist(username) {
 		return newErr(ErrUserNotFound, username)
@@ -129,8 +177,25 @@ func (service *PostService) New(username string, content string, attachments []s
 	for service.db.IsPostExist(id) {
 		id = service.newID()
 	}
+	url := service.getUrl(id)
 
-	if e := service.db.SetPost(id, username, "", content, attachments); e != nil {
+	imgs := []models.Img{}
+	for i, v := range attachments {
+		if i >= service.maxImgInPost {
+			break
+		}
+		imgs = append(imgs, ToModelImg(v))
+	}
+
+	v, ok := utils.GetVsb(vsb)
+	if !ok {
+		// get default
+	}
+
+	if e := service.db.SetPost(
+		id, url, username, time.Now(),
+		"", v, content, imgs,
+	); e != nil {
 		logger.Error("[Post] Cannot set post", e)
 		return newErr(ErrInternal, e.CodeString()+" "+e.Error())
 	}
@@ -138,7 +203,7 @@ func (service *PostService) New(username string, content string, attachments []s
 	return nil
 }
 
-func (service *PostService) Edit(username string, postID string, content string, attachments []string) utils.Error {
+func (service *PostService) Edit(username string, postID string, content string, attachments []AttachImg) utils.Error {
 	if content == "" {
 		return newErr(ErrContent, "empty")
 	}
@@ -146,7 +211,6 @@ func (service *PostService) Edit(username string, postID string, content string,
 		return newErr(ErrContent, "too long")
 	}
 
-	postID = service.fullID(postID)
 	post, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {
@@ -159,7 +223,15 @@ func (service *PostService) Edit(username string, postID string, content string,
 		return newErr(ErrOwner, "not "+username)
 	}
 
-	if e := service.db.UpdatePost(postID, content, attachments); e != nil {
+	imgs := []models.Img{}
+	for i, v := range attachments {
+		if i >= service.maxImgInPost {
+			break
+		}
+		imgs = append(imgs, ToModelImg(v))
+	}
+
+	if e := service.db.UpdatePost(postID, time.Now(), content, imgs); e != nil {
 		switch {
 		// default:
 		}
@@ -169,7 +241,6 @@ func (service *PostService) Edit(username string, postID string, content string,
 }
 
 func (service *PostService) Remove(username string, postID string) utils.Error {
-	postID = service.fullID(postID)
 	post, e := service.db.QueryPostByID(postID)
 	if e != nil {
 		switch {

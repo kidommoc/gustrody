@@ -1,6 +1,7 @@
 package posts
 
 import (
+	"time"
 	"unicode/utf8"
 
 	"github.com/kidommoc/gustrody/internal/logging"
@@ -8,8 +9,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func (service *PostService) Reply(username string, postID string, content string, attachments []string) utils.Error {
-	postID = service.fullID(postID)
+func (service *PostService) Reply(username string, postID string, vsb string, content string, attachments []AttachImg) utils.Error {
 	if !service.user.IsUserExist(username) {
 		return newErr(ErrUserNotFound, username)
 	}
@@ -24,7 +24,25 @@ func (service *PostService) Reply(username string, postID string, content string
 	for service.db.IsPostExist(id) {
 		id = service.newID()
 	}
-	if e := service.db.SetPost(id, username, postID, content, attachments); e != nil {
+	url := service.getUrl(id)
+
+	v, ok := utils.GetVsb(vsb)
+	if !ok {
+		// get default
+	}
+
+	imgs := []models.Img{}
+	for i, v := range attachments {
+		if i >= service.maxImgInPost {
+			break
+		}
+		imgs = append(imgs, ToModelImg(v))
+	}
+
+	if e := service.db.SetPost(
+		id, url, username, time.Now(),
+		postID, v, content, imgs,
+	); e != nil {
 		switch {
 		case e.Code() == models.ErrNotFound && e.Error() == "post":
 			return newErr(ErrPostNotFound, postID)

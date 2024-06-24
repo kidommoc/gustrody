@@ -21,6 +21,7 @@ type Config struct {
 
 	// perference
 	MaxContentLength int `json:"maxCotentLength"`
+	MaxImgInPost     int `json:"maxImgInPost"`
 }
 
 var config *Config

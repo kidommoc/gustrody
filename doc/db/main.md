@@ -2,21 +2,47 @@
 
 Use PostgreSql. Database: `austrody`
 
-## TABLE: user_info
+## TYPEs
+
+- vsb: visibility of post
+- kp: user's encryption key pair (RSA)
+- img: image
+
+```sql
+CREATE TYPE vsb AS ENUM (
+  'public', 'follower', 'direct'
+);
+
+CREATE TYPE kp AS (
+  "pub" text,
+  "pri" text
+);
+
+CREATE TYPE img AS (
+  "url" text,
+  "alt" text
+);
+```
+
+## TABLE: users
 
 - username *PRIMARY*: `varchar(20)`
-- nickname *NULLABLE*: `text`
+- nickname: `text`
 - summary *NULLABLE*: `text`
 - createdAt: `timestamp`
-- icon *NULLABLE*: `text` as url
+- avatar *NULLABLE*: `text` as url
+- keys: `kp` as user's key pair
+- preference: `json`
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
-    "username" varchar(20) PRIMARY KEY,
-    "nickname" text,
-    "summary" text,
-    "createdAt" timestamp NOT NULL,
-    "icon" text
+  "username" varchar(20) PRIMARY KEY,
+  "nickname" text NOT NULL,
+  "summary" text,
+  "createdAt" timestamp NOT NULL,
+  "avatar" text,
+  "keys" kp NOT NULL,
+  "preference" json DEFAULT '{"postVsb":"public","shareVsb":"public"}'
 );
 ```
 
@@ -26,7 +52,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 ```sql
 SELECT
-  "username", "nickname", "summary"
+  "username", "nickname", "summary", "avatar"
 FROM users
 WHERE "username" = ${username};
 ```
@@ -34,8 +60,13 @@ WHERE "username" = ${username};
 - insert a new user
 
 ```sql
-INSERT INTO users("username", "createAt")
-VALUES (${username}, NOW());
+INSERT INTO users(
+  "username", "nickname", "createAt", "keys"
+)
+VALUES (
+  ${username}, ${nickname}, NOW(),
+  ROW(${pub_key}, ${pri_key})
+);
 ```
 
 - set user information
@@ -45,47 +76,100 @@ UPDATE users
 SET
   "nickname" = ${nickname},
   "summary" = ${summary},
+  "avatar" = ${avatar_url}
 WHERE "username" = ${username};
+```
+
+- query a user's encryption key pair
+
+```sql
+SELECT ("keys")."pub", ("keys")."pri"
+FROM users
+WHERE "username" = ${username};
+```
+
+- query a user's preference
+
+```sql
+SELECT "preference"
+FROM users
+WHERE "username" = ${username};
+```
+
+- set a user's preference
+
+```sql
+UPDATE users
+SET "preference" = ${preference_json}
+WHERE "username" = ${username};
+```
+
+## TABLE: foreign_users
+
+- username *PRIMARY, INDEX*: `varchar(60)`
+- inbox: `text` as url
+- pub: `text` as RSA public key
+
+```sql
+CREATE TABLE IF NOT EXISTS foreign_users (
+  "username" varchar(60) PRIMARY KEY,
+  "inbox" text NOT NULL,
+  "pub" text NOT NULL
+);
+```
+
+### Queries
+
+- insert a foreign user
+
+```sql
+INSERT INTO foreign_users("username", "inbox", "pub")
+VALUES (${username}, ${inbox_url}, ${pub_key});
+```
+
+- query a foreign user
+
+```sql
 ```
 
 ## TABLE: follow
 
-- user *PRIMARY, INDEX*: `text`
-- follows *PRIMARY, INDEX*: `text`
+- from *PRIMARY, INDEX*: `varchar(60)`
+- to *PRIMARY, INDEX*: `varchar(60)`
 
 CONSTRAINT:
 
-- `"user"` != `follows`
+- `"from"` != `to`
 
 ```sql
 CREATE TABLE IF NOT EXISTS follow (
-    "from" text,
-    "to" text,
-    PRIMARY KEY ("from", "to")
+  "from" varchar(60),
+  "to" varchar(60) CHECK ("to" <> "from"),
+  PRIMARY KEY ("from", "to")
 );
 
 CREATE INDEX user_follows ON follow ("from");
 CREATE INDEX user_be_followed ON follow ("to");
 
 CREATE VIEW follow_info ("user", "followings", "followers") AS
-    WITH followings AS (
-        SELECT "from" AS u, COUNT(*) AS c
-        FROM follow
-        GROUP BY u
-    ), followers AS (
-        SELECT "to" AS u, COUNT(*) AS c
-        FROM follow
-        GROUP BY u
-    )
-    SELECT
-        users."username" AS "user",
-        COALESCE(followings.c, 0) AS "followings",
-        COALESCE(followers.c, 0) AS "followers"
-    FROM users
-    FULL JOIN followings
-        ON users."username" = followings.u
-    FULL JOIN followers
-        ON users."username" = followers.u;
+  WITH followings AS (
+    SELECT "from" AS u, COUNT(*) AS c
+    FROM follow
+    GROUP BY u
+  ), followers AS (
+    SELECT "to" AS u, COUNT(*) AS c
+    FROM follow
+    GROUP BY u
+  )
+  SELECT
+    users."username" AS "user",
+    COALESCE(followings.c, 0) AS "followings",
+    COALESCE(followers.c, 0) AS "followers"
+  FROM users
+  FULL JOIN followings
+    ON users."username" = followings.u
+  FULL JOIN followers
+    ON users."username" = followers.u;
 ```
 
 ### Queries
@@ -128,24 +212,29 @@ WHERE "from" = ${from} AND "to" = ${to};
 
 ## TABLE: posts
 
-- id *PRIMARY*: `text` as url (generated with uuid)
-- user *INDEX*: `text`
+- id *PRIMARY*: `text` as uuid
+- url: `text` as url
+- date: `timestap`
+- user *INDEX*: `varchar(60)`
 - replying *NULLABLE*: `text` as id of the post replied
-- date: `timestamp`
+- vsb: `vsb` as visibility of post
 - content: `text`
+- media: `img[]` as images attaching to this post
 - likes: `text[]` as id of the users liking this post
 - shares: `text[]` as id of the users sharing this post
 
 ```sql
 CREATE TABLE IF NOT EXISTS posts (
-    "id" text PRIMARY KEY,
-    "user" text NOT NULL,
-    "date" timestamp NOT NULL,
-    "replying" text,
-    "content" text,
-    "media" text[4] DEFAULT array[4]::text[4],
-    "likes" text[] DEFAULT array[]::text[],
-    "shares" text[] DEFAULT array[]::text[]
+  "id" varchar(36) NOT NULL,
+  "url" text NOT NULL,
+  "date" timestamp NOT NULL,
+  "user" varchar(60) NOT NULL,
+  "replying" text,
+  "vsb" vsb NOT NULL,
+  "content" text NOT NULL,
+  "media" img[] DEFAULT array[]::img[],
+  "likes" text[] DEFAULT array[]::text[],
+  "shares" text[] DEFAULT array[]::text[]
 );
 
 CREATE INDEX posters ON posts ("user");
@@ -159,14 +248,16 @@ CREATE INDEX posters ON posts ("user");
 
 ```sql
 INSERT INTO posts(
-  "id", "user", "date",
-  "replying", "content",
+  "id", "url", "user", "date",
+  "vsb", "content", "replying",
   "media"
 )
 VALUES (
-  ${postID}, ${username}, NOW(),
-  ${replying}, ${content},
-  ARRAY[${mediaUrl}, ...]
+  ${postID}, ${url}, ${username}, ${date},
+  ${replying}, ${vsb}, ${content},
+  ARRAY[
+    ROW(${mediaUrl}, ${alt_text}), ...
+  ]
 );
 ```
 
@@ -175,8 +266,10 @@ VALUES (
 ```sql
 UPDATE posts
 SET
-  "content" = ${content}, "date" = NOW(),
-  "media" = ARRAY[${mediaUrl}, ...]
+  "date" = ${date}, "content" = ${content}, 
+  "media" = ARRAY[
+    ROW(${mediaUrl}, ${alt_text}), ...
+  ]
 WHERE "id" = ${postID};
 ```
 
@@ -192,7 +285,8 @@ WHERE "id" = ${postID};
 ```sql
 -- QUERY post
 SELECT
-  "id", "user", "date", "content", "media",
+  "id", "url", "user", "date",
+  "vsb", "content", "media",
   CARDINALITY("likes") as "likes",
   CARDINALITY("shares") as "shares"
 FROM posts
@@ -208,8 +302,8 @@ WITH RECURSIVE rt AS (
       JOIN rt ON posts."id" = rt."replying"
 )
 SELECT
-  posts."id", posts."user", posts."date",
-  posts."content", posts."media",
+  posts."id", posts."url", posts."user", posts."date",
+  posts."vsb", posts."content", posts."media",
   CARDINALITY(posts."likes") as "likes",
   CARDINALITY(posts."shares") as "shares",
   posts."replying", rt."level"
@@ -227,8 +321,8 @@ WITH RECURSIVE rs AS (
       JOIN rs ON rs."id" = posts."replying"
 )
 SELECT
-  posts."id", posts."user", posts."date",
-  posts."content", posts."media",
+  posts."id", posts."url", posts."user", posts."date",
+  posts."vsb", posts."content", posts."media",
   CARDINALITY(posts."likes") as "likes",
   CARDINALITY(posts."shares") as "shares",
   posts."replying", rs."level"
@@ -246,8 +340,8 @@ ORDER BY "level" ASC, "date" DESC;
     WHERE p1."user" = ${username} AND p2."id" = p1."replying"
   )
   SELECT
-    posts."id", posts."user", posts."date",
-    posts."content", posts."media",
+    posts."id", posts."url", posts."user", posts."date",
+    posts."vsb", posts."content", posts."media",
     CARDINALITY("likes") as "likes",
     CARDINALITY("shares") as "shares",
     rr."user" AS "replyTo", NULL AS "sharedBy",
@@ -256,7 +350,8 @@ ORDER BY "level" ASC, "date" DESC;
   WHERE posts."user" = ${username} AND posts."id" = rr."id"
 UNION ALL
   SELECT
-    "id", "user", "date", "content", "media",
+    "id", "url", "user", "date",
+    "vsb", "content", "media",
     CARDINALITY("likes") as "likes",
     CARDINALITY("shares") as "shares",
     NULL AS "replyTo", NULL AS "sharedBy",
@@ -317,15 +412,16 @@ WHERE "id" = ${postID};
 
 ## TABLE: shares
 
-- id *PRIMARY, FOREIGN*: `text` as url, referencing to `posts."id"`
-- user *PRIMARY, INDEX*: `text`
+- id *PRIMARY, FOREIGN*: `text` as uuid, referencing to `posts."id"`
+- user *PRIMARY, INDEX*: `varchar(60)`
 - date: `timestamp`
 
 ```sql
 CREATE TABLE IF NOT EXISTS shares (
-  "id" text NOT NULL,
-  "user" text NOT NULL,
+  "user" varchar(60) NOT NULL,
+  "id" varchar(36) NOT NULL,
   "date" timestamp NOT NULL,
+  "vsb" vsb NOT NULL,
   PRIMARY KEY ("id", "user"),
   FOREIGN KEY ("id") REFERENCES posts("id")
 );
@@ -341,8 +437,8 @@ CREATE INDEX sharers ON shares ("user");
 
 ```sql
 SELECT
-  posts."id", posts."user", posts."date",
-  posts."content", posts."media",
+  posts."id", posts."url", posts."user", posts."date",
+  shares."vsb", posts."content", posts."media",
   CARDINALITY("likes") as "likes",
   CARDINALITY("shares") as "shares",
   NULL AS "replyTo", shares."user" as "sharedBy",
@@ -358,10 +454,10 @@ ORDER BY "act" DESC;
 
 ```sql
 -- SET
-INSERT INTO shares
-VALUES (${postID}, ${username}, NOW());
+INSERT INTO shares("user", "id", "date", "vsb")
+VALUES (${username}, ${postID}, ${date}, ${vsb});
 
 -- UNSET
 DELETE FROM shares
-WHERE "id" = ${postID} and "user" = ${username};
+WHERE "user" = ${username} and "id" = ${postID};
 ```

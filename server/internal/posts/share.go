@@ -1,24 +1,32 @@
 package posts
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/users"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func (service *PostService) GetShares(postID string) (list []*users.UserInfo, err utils.Error) {
-	postID = service.fullID(postID)
-	result, e := service.db.QueryShares(postID)
+func (service *PostService) GetShares(user string, postID string) (list []*users.UserInfo, err utils.Error) {
+	result, owner, vsb, e := service.db.QueryShares(postID)
+	if e != nil && e.Code() != models.ErrNotFound {
+		logger := logging.Get()
+		logger.Error("[Posts.Share]", err)
+		return nil, newErr(ErrInternal)
+	}
+
+	if !service.checkPermission(user, owner, postID, vsb) {
+		return nil, newErr(
+			ErrNotPermitted,
+			fmt.Sprintf("%s is not allowed to visit %s", user, postID),
+		)
+	}
+
 	if e != nil {
-		switch {
-		case e.Code() == models.ErrNotFound && e.Error() == "post":
-			return list, newErr(ErrPostNotFound, postID)
-		default:
-			logger := logging.Get()
-			logger.Error("[Posts.Share]", err)
-			return nil, newErr(ErrInternal)
-		}
+		return list, newErr(ErrPostNotFound, postID)
 	}
 
 	us := make(map[string]*users.UserInfo)
@@ -48,9 +56,13 @@ func (service *PostService) GetShares(postID string) (list []*users.UserInfo, er
 	return list, nil
 }
 
-func (service *PostService) Share(username string, postID string) utils.Error {
-	postID = service.fullID(postID)
-	if err := service.db.SetShare(username, postID); err != nil {
+func (service *PostService) Share(username string, postID string, vsb string) utils.Error {
+	v, ok := utils.GetVsb(vsb)
+	if !ok {
+		// get default
+	}
+
+	if err := service.db.SetShare(username, postID, time.Now(), v); err != nil {
 		switch {
 		case err.Code() == models.ErrNotFound:
 			return newErr(ErrPostNotFound, postID)
@@ -64,7 +76,6 @@ func (service *PostService) Share(username string, postID string) utils.Error {
 }
 
 func (service *PostService) Unshare(username string, postID string) utils.Error {
-	postID = service.fullID(postID)
 	if err := service.db.RemoveShare(username, postID); err != nil {
 		switch err.Code() {
 		case models.ErrNotFound:

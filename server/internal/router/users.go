@@ -12,7 +12,10 @@ import (
 
 func routeUsers(router fiber.Router) {
 	router.Get("/:username", getUserProfile)
-	router.Get("/:username/posts", getUserPosts)
+	router.Get("/:username/posts", func(c *fiber.Ctx) error {
+		c.Locals("forced", false)
+		return c.Next()
+	}, mAuth, getUserPosts)
 	router.Get("/:username/followings", getUserFollowings)
 	router.Get("/:username/followers", getUserFollowers)
 	router.Put("/follow/:username", mAuth, follow)
@@ -46,15 +49,19 @@ func getUserProfile(c *fiber.Ctx) error {
 }
 
 func getUserPosts(c *fiber.Ctx) error {
-	username := c.Params("username")
-	if username == "" {
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		username = ""
+	}
+	target := c.Params("username")
+	if target == "" {
 		c.Status(fiber.StatusBadRequest)
 		c.SendString("Acquire username")
 	}
 
 	userService := users.NewService(models.UserInstance())
 	postService := posts.NewService(models.PostInstance(), userService)
-	list, err := postService.GetByUser(username)
+	list, err := postService.GetByUser(username, target)
 	if err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:

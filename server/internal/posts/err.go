@@ -9,6 +9,7 @@ const (
 	ErrShareNotFound
 	ErrContent
 	ErrOwner
+	ErrNotPermitted
 	ErrInternal
 )
 
@@ -36,6 +37,8 @@ func (e PostErr) CodeString() string {
 		return "Content"
 	case ErrOwner:
 		return "Owner"
+	case ErrNotPermitted:
+		return "NotPermitted"
 	case ErrInternal:
 		return "Internal"
 	}

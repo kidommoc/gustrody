@@ -7,17 +7,16 @@ import (
 
 type UserInfo struct {
 	ID       string `json:"id"`
-	Username string `json:"preferredUsername"`
-	Nickname string `json:"name"`
+	Username string `json:"username"`
+	Nickname string `json:"nickname"`
+	Avatar   string `json:"avatar"`
 }
 
 type UserProfile struct {
 	UserInfo
-	Summary    string `json:"summary"`
-	Follows    int64  `json:"follows"`
-	Followed   int64  `json:"followed"`
-	Followings string `json:"followings"`
-	Followers  string `json:"followers"`
+	Summary  string `json:"summary"`
+	Follows  int64  `json:"follows"`
+	Followed int64  `json:"followed"`
 }
 
 // user service

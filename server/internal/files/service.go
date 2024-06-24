@@ -19,6 +19,7 @@ type File struct {
 }
 
 type FileService struct {
+	site   string
 	imgDir string
 }
 
@@ -30,6 +31,7 @@ func NewFileService(c ...config.Config) *FileService {
 		cfg = c[0]
 	}
 	return &FileService{
+		site:   cfg.Site,
 		imgDir: cfg.ImgDir,
 	}
 }

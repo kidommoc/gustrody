@@ -11,9 +11,18 @@ import (
 )
 
 func routePosts(router fiber.Router) {
-	router.Get("/:postID", getPost)
-	router.Get("/:postID/likes", getPostLikes)
-	router.Get("/:postID/shares", getPostShares)
+	router.Get("/:postID", func(c *fiber.Ctx) error {
+		c.Locals("forced", false)
+		return c.Next()
+	}, mAuth, getPost)
+	router.Get("/:postID/likes", func(c *fiber.Ctx) error {
+		c.Locals("forced", false)
+		return c.Next()
+	}, mAuth, getPostLikes)
+	router.Get("/:postID/shares", func(c *fiber.Ctx) error {
+		c.Locals("forced", false)
+		return c.Next()
+	}, mAuth, getPostShares)
 	router.Put("/", mAuth, newPost)
 	router.Post("/:postID", mAuth, editPost)
 	router.Delete("/:postID", mAuth, removePost)
@@ -26,6 +35,10 @@ func routePosts(router fiber.Router) {
 }
 
 func getPost(c *fiber.Ctx) error {
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		username = ""
+	}
 	postID := c.Params("postID")
 	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
@@ -34,9 +47,11 @@ func getPost(c *fiber.Ctx) error {
 
 	userService := users.NewService(models.UserInstance())
 	postService := posts.NewService(models.PostInstance(), userService)
-	post, err := postService.Get(postID)
+	post, err := postService.Get(username, postID)
 	if err != nil {
 		switch err.Code() {
+		case posts.ErrNotPermitted:
+			return c.SendStatus(fiber.StatusForbidden)
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
@@ -56,6 +71,10 @@ func getPost(c *fiber.Ctx) error {
 }
 
 func getPostLikes(c *fiber.Ctx) error {
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		username = ""
+	}
 	postID := c.Params("postID")
 	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
@@ -64,9 +83,11 @@ func getPostLikes(c *fiber.Ctx) error {
 
 	userService := users.NewService(models.UserInstance())
 	postService := posts.NewService(models.PostInstance(), userService)
-	list, err := postService.GetLikes(postID)
+	list, err := postService.GetLikes(username, postID)
 	if err != nil {
 		switch err.Code() {
+		case posts.ErrNotPermitted:
+			return c.SendStatus(fiber.StatusForbidden)
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
@@ -83,6 +104,10 @@ func getPostLikes(c *fiber.Ctx) error {
 }
 
 func getPostShares(c *fiber.Ctx) error {
+	username, ok := c.Locals("username").(string)
+	if !ok {
+		username = ""
+	}
 	postID := c.Params("postID")
 	if postID == "" {
 		c.Status(fiber.StatusBadRequest)
@@ -91,9 +116,11 @@ func getPostShares(c *fiber.Ctx) error {
 
 	userService := users.NewService(models.UserInstance())
 	postService := posts.NewService(models.PostInstance(), userService)
-	list, err := postService.GetShares(postID)
+	list, err := postService.GetShares(username, postID)
 	if err != nil {
 		switch err.Code() {
+		case posts.ErrNotPermitted:
+			return c.SendStatus(fiber.StatusForbidden)
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
@@ -110,8 +137,9 @@ func getPostShares(c *fiber.Ctx) error {
 }
 
 type contentBody struct {
-	Content     string   `json:"content"`
-	Attachments []string `json:"attachments,omitempty"`
+	Content     string            `json:"content"`
+	Vsb         string            `json:"vsb"`
+	Attachments []posts.AttachImg `json:"attachments,omitempty"`
 }
 
 func newPost(c *fiber.Ctx) error {
@@ -119,16 +147,16 @@ func newPost(c *fiber.Ctx) error {
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	content := new(contentBody)
-	c.BodyParser(content) // should not reach error..?
-	if content.Attachments == nil {
-		content.Attachments = []string{}
+	body := new(contentBody)
+	c.BodyParser(body) // should not reach error..?
+	if body.Attachments == nil {
+		body.Attachments = []posts.AttachImg{}
 	}
 
 	userService := users.NewService(models.UserInstance())
 	postService := posts.NewService(models.PostInstance(), userService)
 	if err := postService.New(
-		username, content.Content, content.Attachments,
+		username, body.Vsb, body.Content, body.Attachments,
 	); err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:
@@ -174,7 +202,7 @@ func replyPost(c *fiber.Ctx) error {
 	postService := posts.NewService(models.PostInstance(), userService)
 
 	if err := postService.Reply(
-		username, postID, content.Content, content.Attachments,
+		username, postID, content.Vsb, content.Content, content.Attachments,
 	); err != nil {
 		switch err.Code() {
 		case posts.ErrUserNotFound:
@@ -354,10 +382,11 @@ func sharePost(c *fiber.Ctx) error {
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
+	vsb := c.Query("visibility")
 
 	userService := users.NewService(models.UserInstance())
 	postService := posts.NewService(models.PostInstance(), userService)
-	if err := postService.Share(username, postID); err != nil {
+	if err := postService.Share(username, postID, vsb); err != nil {
 		switch err.Code() {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)

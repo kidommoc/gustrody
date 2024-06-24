@@ -14,6 +14,7 @@ type User struct {
 	Username string `json:"username"`
 	Nickname string `json:"nickname"`
 	Summary  string `json:"summary"`
+	Avatar   string `json:"avatar"`
 }
 
 type follow struct {
@@ -25,6 +26,7 @@ type follow struct {
 
 type IUserDb interface {
 	IsUserExist(username string) bool
+	IsFollowing(username string, target string) bool
 	QueryUser(username string) (user User, err utils.Error)
 	QueryUserFollowInfo(username string) (follows int64, followed int64, err utils.Error)
 	QueryUserFollowings(username string) (list []*User, err utils.Error)
@@ -34,15 +36,15 @@ type IUserDb interface {
 }
 
 // should implemented with Postgre
-type UsersDb struct {
+type UserDb struct {
 	pool *_db.ConnPool[*_db.PqConn]
 }
 
-var userIns *UsersDb = nil
+var userIns *UserDb = nil
 
-func UserInstance() *UsersDb {
+func UserInstance() *UserDb {
 	if userIns == nil {
-		userIns = &UsersDb{
+		userIns = &UserDb{
 			pool: _db.MainPool(),
 		}
 	}
@@ -51,7 +53,7 @@ func UserInstance() *UsersDb {
 
 // functions
 
-func (db *UsersDb) IsUserExist(username string) bool {
+func (db *UserDb) IsUserExist(username string) bool {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -77,11 +79,15 @@ func (db *UsersDb) IsUserExist(username string) bool {
 	return true
 }
 
+func (db *UserDb) IsFollowing(username string, target string) bool {
+	return true
+}
+
 // ERRORS
 //
 //   - DbInternal
 //   - NotFound "user"
-func (db *UsersDb) QueryUser(username string) (user User, err utils.Error) {
+func (db *UserDb) QueryUser(username string) (user User, err utils.Error) {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -123,7 +129,7 @@ func (db *UsersDb) QueryUser(username string) (user User, err utils.Error) {
 //
 //   - DbInternal
 //   - NotFound "user"
-func (db *UsersDb) QueryUserFollowInfo(username string) (follows int64, followed int64, err utils.Error) {
+func (db *UserDb) QueryUserFollowInfo(username string) (follows int64, followed int64, err utils.Error) {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -156,7 +162,7 @@ func (db *UsersDb) QueryUserFollowInfo(username string) (follows int64, followed
 //
 //   - DbInternal
 //   - NotFound "user"
-func (db *UsersDb) QueryUserFollowings(username string) (list []*User, err utils.Error) {
+func (db *UserDb) QueryUserFollowings(username string) (list []*User, err utils.Error) {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -198,7 +204,7 @@ func (db *UsersDb) QueryUserFollowings(username string) (list []*User, err utils
 //
 //   - DbInternal
 //   - NotFound "user"
-func (db *UsersDb) QueryUserFollowers(username string) (list []*User, err utils.Error) {
+func (db *UserDb) QueryUserFollowers(username string) (list []*User, err utils.Error) {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -240,7 +246,7 @@ func (db *UsersDb) QueryUserFollowers(username string) (list []*User, err utils.
 //   - DbInternal
 //   - NotFound "from", "to"
 //   - Dunplicate "follow"
-func (db *UsersDb) SetFollow(from string, to string) utils.Error {
+func (db *UserDb) SetFollow(from string, to string) utils.Error {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -271,7 +277,7 @@ func (db *UsersDb) SetFollow(from string, to string) utils.Error {
 //
 //   - DbInternal
 //   - NotFound "from", "to", "follow"
-func (db *UsersDb) RemoveFollow(from string, to string) utils.Error {
+func (db *UserDb) RemoveFollow(from string, to string) utils.Error {
 	logger := logging.Get()
 	conn, err := db.pool.Open()
 	if err != nil {

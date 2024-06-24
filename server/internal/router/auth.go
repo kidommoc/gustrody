@@ -19,11 +19,19 @@ func routeAuth(router fiber.Router) {
 }
 
 func mAuth(c *fiber.Ctx) error {
+	forced, ok := c.Locals("forced").(bool)
+	if !ok {
+		forced = true
+	}
 	session := c.Get("Session")
 	authroization := c.Get("Authorization")
 	if session == "" || authroization == "" {
-		c.Status(fiber.StatusUnauthorized)
-		return c.SendString("Missing HTTP header: Session and/or Authorization")
+		if forced {
+			c.Status(fiber.StatusUnauthorized)
+			return c.SendString("Missing HTTP header: Session and/or Authorization")
+		} else {
+			return c.Next()
+		}
 	}
 	// parse bearer to token
 	bearer := strings.Split(authroization, " ")

@@ -19,7 +19,7 @@ const (
 	TYPE_PNG  FileType = "png"
 )
 
-func (service *FileService) StoreImage(user string, buf []byte) (path string, err utils.Error) {
+func (service *FileService) StoreImage(user string, buf []byte) (url string, mediaType string, err utils.Error) {
 	logger := logging.Get()
 	img := File{Uploader: user}
 
@@ -38,7 +38,7 @@ func (service *FileService) StoreImage(user string, buf []byte) (path string, er
 	if e != nil {
 		err = newErr(ErrFile, "decode: "+e.Error())
 		logger.Error("[Files.Image] Cannot decode file to image", err)
-		return "", err
+		return "", "", err
 	}
 	switch t {
 	case "jpg":
@@ -49,7 +49,7 @@ func (service *FileService) StoreImage(user string, buf []byte) (path string, er
 	default:
 		err = newErr(ErrFile, "type: "+t)
 		logger.Error("[Files.Image] Wrong file type", err)
-		return "", err
+		return "", "", err
 	}
 
 	dst := fmt.Sprintf("%s/%s.%s",
@@ -61,8 +61,10 @@ func (service *FileService) StoreImage(user string, buf []byte) (path string, er
 	if e := service.storeFile(dst, buf); e != nil {
 		// handle error
 		logger.Error("[Files.Image] Cannot store image", e)
-		return "", e
+		return "", "", e
 	}
 
-	return fmt.Sprintf("/imgs/%s.%s", img.Filename, img.Ext), nil
+	url = fmt.Sprintf("%s/imgs/%s.%s", service.site, img.Filename, img.Ext)
+	mediaType = "image/" + string(img.Ext)
+	return url, mediaType, nil
 }

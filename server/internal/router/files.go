@@ -51,7 +51,7 @@ func uploadImg(c *fiber.Ctx) error {
 	}
 
 	fileService := files.NewFileService()
-	path, e := fileService.StoreImage(username, b)
+	path, mediaType, e := fileService.StoreImage(username, b)
 	if e != nil {
 		c.Status(http.StatusInternalServerError)
 		return nil
@@ -59,6 +59,9 @@ func uploadImg(c *fiber.Ctx) error {
 	msg := fmt.Sprintf("[FILE]UPLOAD: Image from %s. Path: %s", username, path)
 	logger.Info(msg)
 	c.Status(fiber.StatusOK)
-	c.SendString(path)
+	c.JSON(fiber.Map{
+		"type": mediaType,
+		"url":  path,
+	})
 	return nil
 }

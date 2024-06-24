@@ -9,6 +9,10 @@ func (service *UserService) IsUserExist(username string) bool {
 	return service.db.IsUserExist(username)
 }
 
+func (service *UserService) IsFollowing(username string, target string) bool {
+	return service.db.IsFollowing(username, target)
+}
+
 func (service *UserService) GetInfo(username string) (info UserInfo, err utils.Error) {
 	logger := logging.Get()
 	u, e := service.db.QueryUser(username)
@@ -35,9 +39,7 @@ func (service *UserService) GetProfile(username string) (info UserProfile, err u
 			Username: u.Username,
 			Nickname: u.Nickname,
 		},
-		Summary:    u.Summary,
-		Followings: info.ID + "/followings",
-		Followers:  info.ID + "/followers",
+		Summary: u.Summary,
 	}
 	info.Follows, info.Followed, e = service.db.QueryUserFollowInfo(username)
 	if e != nil {

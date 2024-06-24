@@ -1,25 +1,31 @@
 package posts
 
 import (
+	"fmt"
+
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/users"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func (service *PostService) GetLikes(postID string) (list []*users.UserInfo, err utils.Error) {
+func (service *PostService) GetLikes(user string, postID string) (list []*users.UserInfo, err utils.Error) {
 	logger := logging.Get()
-	postID = service.fullID(postID)
-	result, e := service.db.QueryLikes(postID)
+	result, owner, vsb, e := service.db.QueryLikes(postID)
+	if e != nil && e.Code() != models.ErrNotFound {
+		logger.Error("[Posts.Like]", err)
+		return nil, newErr(ErrInternal)
+	}
+
+	if !service.checkPermission(user, owner, postID, vsb) {
+		return nil, newErr(
+			ErrNotPermitted,
+			fmt.Sprintf("%s is not allowed to visit %s", user, postID),
+		)
+	}
+
 	if e != nil {
-		switch {
-		case e.Code() == models.ErrNotFound && e.Error() == "post":
-			return list, newErr(ErrPostNotFound, postID)
-			// default:
-		default:
-			logger.Error("[Posts.Like]", err)
-			return nil, newErr(ErrInternal)
-		}
+		return list, newErr(ErrPostNotFound, postID)
 	}
 
 	list = make([]*users.UserInfo, 0, len(result))
@@ -37,7 +43,6 @@ func (service *PostService) GetLikes(postID string) (list []*users.UserInfo, err
 
 func (service *PostService) Like(username string, postID string) utils.Error {
 	logger := logging.Get()
-	postID = service.fullID(postID)
 	if err := service.db.SetLike(username, postID); err != nil {
 		switch {
 		case err.Code() == models.ErrNotFound:
@@ -52,7 +57,6 @@ func (service *PostService) Like(username string, postID string) utils.Error {
 
 func (service *PostService) Unlike(username string, postID string) utils.Error {
 	logger := logging.Get()
-	postID = service.fullID(postID)
 	if err := service.db.RemoveLike(username, postID); err != nil {
 		switch err.Code() {
 		case models.ErrNotFound:

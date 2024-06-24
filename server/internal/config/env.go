@@ -25,7 +25,7 @@ func loadEnv() {
 
 	site := envmap["SITE"]
 	// check site
-	config.Site = site
+	config.Site = utils.TrimPath(site)
 
 	// port. default 8000
 	port, err := strconv.Atoi(envmap["PORT"])
@@ -90,8 +90,15 @@ func loadEnv() {
 
 	// max content length. default: 500
 	mcl, err := strconv.Atoi(envmap["MAX_CONTENT_LENGTH"])
-	if err != nil || mcl < 0 {
+	if err != nil || mcl < 1 {
 		mcl = 500
 	}
 	config.MaxContentLength = mcl
+
+	// max image in post. default: 4
+	mip, err := strconv.Atoi(envmap["MAX_IMG_IN_POST"])
+	if err != nil || mcl < 1 {
+		mip = 4
+	}
+	config.MaxImgInPost = mip
 }
