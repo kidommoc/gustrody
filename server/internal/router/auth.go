@@ -2,11 +2,12 @@ package router
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
-	"github.com/kidommoc/gustrody/internal/auth"
 	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/kidommoc/gustrody/internal/models"
+	"github.com/kidommoc/gustrody/internal/services"
+	"github.com/kidommoc/gustrody/internal/services/auth"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -40,12 +41,16 @@ func mAuth(c *fiber.Ctx) error {
 		return c.SendString("Invalid header: Authorization.\nShould be Bearer token in JWT.")
 	}
 
-	db := models.AuthInstance()
-	authService := auth.NewService(db)
+	var authService *auth.OauthService
+	err := services.Get(reflect.ValueOf(&authService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	username, err := authService.VerifyToken(bearer[1], session)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
-		switch err.Code() {
+		switch err {
 		case auth.ErrExpired:
 			return c.SendString("Token expired.")
 		case auth.ErrInvalid:
@@ -78,12 +83,16 @@ func login(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	db := models.AuthInstance()
-	authService := auth.NewService(db)
+	var authService *auth.OauthService
+	err := services.Get(reflect.ValueOf(&authService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	session, oauth, err := authService.Login(body.Username, body.Password)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
-		switch err.Code() {
+		switch err {
 		case auth.ErrUserNotFound:
 			return c.SendString("User not found.")
 		case auth.ErrWrongPassword:

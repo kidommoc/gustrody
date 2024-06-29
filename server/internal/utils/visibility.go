@@ -1,11 +1,11 @@
 package utils
 
-type Vsb string
+type Vsb uint
 
 const (
-	Vsb_PUBLIC   Vsb = "public"
-	Vsb_FOLLOWER Vsb = "follower"
-	Vsb_DIRECT   Vsb = "direct"
+	Vsb_PUBLIC Vsb = iota
+	Vsb_FOLLOWER
+	Vsb_DIRECT
 )
 
 func GetVsb(literal string) (vsb Vsb, ok bool) {
@@ -19,4 +19,16 @@ func GetVsb(literal string) (vsb Vsb, ok bool) {
 	default:
 		return Vsb_PUBLIC, false
 	}
+}
+
+func (v Vsb) String() string {
+	switch v {
+	case Vsb_PUBLIC:
+		return "public"
+	case Vsb_FOLLOWER:
+		return "follower"
+	case Vsb_DIRECT:
+		return "direct"
+	}
+	return "public"
 }

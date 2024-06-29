@@ -32,8 +32,11 @@ CREATE TABLE IF NOT EXISTS users (
   "createdAt" timestamp NOT NULL,
   "avatar" text,
   "keys" kp, -- NOT NULL
-  "preference" json DEFAULT '{"postVsb":"public","shareVsb":"public"}'
+  "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
 );
+
+CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
+CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
 
 CREATE TABLE IF NOT EXISTS follow (
   "from" text,

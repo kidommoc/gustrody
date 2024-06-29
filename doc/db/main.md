@@ -42,8 +42,11 @@ CREATE TABLE IF NOT EXISTS users (
   "createdAt" timestamp NOT NULL,
   "avatar" text,
   "keys" kp NOT NULL,
-  "preference" json DEFAULT '{"postVsb":"public","shareVsb":"public"}'
+  "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
 );
+
+CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
+CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
 ```
 
 ### Queries
@@ -91,7 +94,7 @@ WHERE "username" = ${username};
 - query a user's preference
 
 ```sql
-SELECT "preference"
+SELECT "preferences"
 FROM users
 WHERE "username" = ${username};
 ```
@@ -100,7 +103,7 @@ WHERE "username" = ${username};
 
 ```sql
 UPDATE users
-SET "preference" = ${preference_json}
+SET "preferences" = ${preference_json}
 WHERE "username" = ${username};
 ```
 

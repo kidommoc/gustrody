@@ -5,7 +5,6 @@ import (
 
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/kidommoc/gustrody/internal/utils"
 
 	_ "github.com/lib/pq"
 )
@@ -20,6 +19,7 @@ type Conn interface {
 }
 
 type absConn[C Conn] struct {
+	lg   logging.Logger
 	pool *ConnPool[C]
 }
 
@@ -35,21 +35,21 @@ func (c *absConn[C]) Closed() bool {
 // connection pool
 
 type ConnPool[C Conn] struct {
+	lg       logging.Logger
 	capacity int
 	using    int
 	client   interface{}
-	newConn  func(interface{}, *ConnPool[C]) (C, bool)
+	newConn  func(interface{}, logging.Logger, *ConnPool[C]) (C, bool)
 }
 
 // should be async
-func (p *ConnPool[C]) Open() (c C, err utils.Error) {
+func (p *ConnPool[C]) Open() (c C, err error) {
 	if p.using >= p.capacity {
-		return c, newErr(ErrNoConn)
+		return c, ErrNoConn
 	}
-	c, ok := p.newConn(p.client, p)
+	c, ok := p.newConn(p.client, p.lg, p)
 	if !ok {
-		// handle error
-		return c, newErr(100)
+		return c, ErrNoConn
 	}
 	p.using += 1
 	return c, nil
@@ -65,12 +65,14 @@ func (p *ConnPool[C]) returnConn() {
 
 var authPoolIns *ConnPool[*RdConn] = nil
 
-func AuthPool() *ConnPool[*RdConn] {
+func AuthPool(cfg *config.Config, lg logging.Logger) *ConnPool[*RdConn] {
 	if authPoolIns != nil {
 		return authPoolIns
 	}
-	cfg := config.Get()
-	authPoolIns = newRdConnPool(cfg, redis_auth)
+	if cfg == nil || lg == nil {
+		return nil
+	}
+	authPoolIns = newRdConnPool(*cfg, lg, redis_auth)
 	return authPoolIns
 }
 
@@ -78,19 +80,22 @@ func AuthPool() *ConnPool[*RdConn] {
 
 var mainPoolIns *ConnPool[*PqConn] = nil
 
-func MainPool() *ConnPool[*PqConn] {
+func MainPool(cfg *config.Config, lg logging.Logger) *ConnPool[*PqConn] {
 	if mainPoolIns != nil {
 		return mainPoolIns
 	}
-	cfg := config.Get()
-	mainPoolIns = newPqConnPool(cfg)
+	if cfg == nil || lg == nil {
+		return nil
+	}
+	mainPoolIns = newPqConnPool(*cfg, lg)
 	return mainPoolIns
 }
 
 func Init() {
+	cfg := config.Get()
 	logger := logging.Get()
-	AuthPool()
+	AuthPool(&cfg, logger)
 	logger.Info("[Db]Initailized AuthPool")
-	MainPool()
+	MainPool(&cfg, logger)
 	logger.Info("[Db]Initailized MainPool")
 }

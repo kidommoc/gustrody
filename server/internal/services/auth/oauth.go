@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
@@ -53,16 +54,18 @@ func generateToken(u string, s string, exp uint) string {
 // oauth service
 
 type OauthService struct {
+	lg logging.Logger
 	db models.IAuthDb
 }
 
-func NewService(db models.IAuthDb) *OauthService {
+func NewService(db models.IAuthDb, lg logging.Logger) *OauthService {
 	return &OauthService{
+		lg: lg,
 		db: db,
 	}
 }
 
-func (service *OauthService) VerifyToken(token string, session string) (username string, err utils.Error) {
+func (service *OauthService) VerifyToken(token, session string) (username string, err error) {
 	parsed, e := jwt.Parse(token, func(tok *jwt.Token) (interface{}, error) {
 		if _, ok := tok.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("jwt method error")
@@ -73,41 +76,41 @@ func (service *OauthService) VerifyToken(token string, session string) (username
 	if !parsed.Valid {
 		switch {
 		case errors.Is(e, jwt.ErrTokenExpired):
-			return "", newErr(ErrExpired)
+			return "", ErrExpired
 		default:
-			return "", newErr(ErrInvalid)
+			return "", ErrInvalid
 		}
 	}
 
 	username, e = parsed.Claims.GetIssuer()
 	if e != nil {
-		return "", newErr(ErrInvalid)
+		return "", ErrInvalid
 	}
 	sess, e := parsed.Claims.GetSubject()
 	if e != nil {
-		return "", newErr(ErrInvalid)
+		return "", ErrInvalid
 	}
 
 	if sess != session {
-		return "", newErr(ErrWrongSession)
+		return "", ErrWrongSession
 	}
 	return username, nil
 }
 
-func (service *OauthService) Login(username string, password string) (session string, oauth OauthToken, err utils.Error) {
+func (service *OauthService) Login(username, password string) (session string, oauth OauthToken, err error) {
 	p, err := service.db.QueryPasswordOfUser(username)
 	if err != nil {
-		return "", oauth, newErr(ErrUserNotFound)
+		return "", oauth, ErrUserNotFound
 	}
 	if p != password {
-		return "", oauth, newErr(ErrWrongPassword)
+		return "", oauth, ErrWrongPassword
 	}
 	session = generateSession()
 	// service.db.SetSession(session, username)
 	return session, *NewOauth(username, session), nil
 }
 
-func (service *OauthService) RefreshToken(session string, refresh string) (oauth OauthToken, err utils.Error) {
+func (service *OauthService) RefreshToken(session, refresh string) (oauth OauthToken, err error) {
 	/* validate */
 	username, err := service.VerifyToken(refresh, session)
 	if err != nil {

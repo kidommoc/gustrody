@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/kidommoc/gustrody/internal/config"
-	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 type logLevel uint
@@ -98,7 +97,14 @@ func (h *shellHandler) Handle(ctx context.Context, r slog.Record) error {
 
 // logger
 
-type Logger struct {
+type Logger interface {
+	Debug(msg string, attach ...any)
+	Info(msg string, attach ...any)
+	Warning(msg string, attach ...any)
+	Error(msg string, err error)
+}
+
+type logger struct {
 	path        string
 	date        string
 	level       logLevel
@@ -109,9 +115,9 @@ type Logger struct {
 	logfile     *os.File
 }
 
-var instance *Logger = nil
+var instance *logger = nil
 
-func (l *Logger) update() {
+func (l *logger) update() {
 	if l.split == split_none && l.fileLogger != nil { // don't split, update is not required
 		return
 	}
@@ -155,7 +161,7 @@ func (l *Logger) update() {
 	))
 }
 
-func Get(c ...config.Config) *Logger {
+func Get(c ...config.Config) Logger {
 	if instance != nil {
 		return instance
 	}
@@ -166,7 +172,7 @@ func Get(c ...config.Config) *Logger {
 	} else {
 		cfg = c[0]
 	}
-	l := Logger{
+	l := logger{
 		path:  cfg.Logfile,
 		level: levels[cfg.LogLevel],
 		split: splits[cfg.LogSplit],
@@ -196,12 +202,12 @@ func handleAttrs(attrs ...any) []any {
 	return attrs
 }
 
-func (l *Logger) Debug(msg string, attach ...any) {
+func (l *logger) Debug(msg string, attach ...any) {
 	// shell
 	l.shellLogger.Debug(msg, handleAttrs(attach...)...)
 }
 
-func (l *Logger) Info(msg string, attach ...any) {
+func (l *logger) Info(msg string, attach ...any) {
 	if l.level <= level_info { // file
 		l.update()
 		l.fileLogger.Info(msg, handleAttrs(attach...)...)
@@ -210,7 +216,7 @@ func (l *Logger) Info(msg string, attach ...any) {
 	}
 }
 
-func (l *Logger) Warning(msg string, attach ...any) {
+func (l *logger) Warning(msg string, attach ...any) {
 	if l.level <= level_warning {
 		l.update()
 		l.fileLogger.Warn(msg, handleAttrs(attach...)...)
@@ -219,14 +225,13 @@ func (l *Logger) Warning(msg string, attach ...any) {
 	}
 }
 
-func (l *Logger) Error(msg string, err utils.Error) {
+func (l *logger) Error(msg string, err error) {
 	if l.level <= level_error {
 		l.update()
 		if err == nil {
 			l.fileLogger.Error(msg)
 		} else {
 			l.fileLogger.Error(msg,
-				slog.String("code", err.CodeString()),
 				slog.String("msg", err.Error()),
 			)
 		}
@@ -235,7 +240,6 @@ func (l *Logger) Error(msg string, err utils.Error) {
 			l.shellLogger.Error(msg)
 		} else {
 			l.shellLogger.Error(msg,
-				slog.String("code", err.CodeString()),
 				slog.String("msg", err.Error()),
 			)
 		}

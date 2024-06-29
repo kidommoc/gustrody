@@ -2,16 +2,11 @@ package files
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
-	"time"
-
-	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 const (
@@ -19,26 +14,20 @@ const (
 	TYPE_PNG  FileType = "png"
 )
 
-func (service *FileService) StoreImage(user string, buf []byte) (url string, mediaType string, err utils.Error) {
-	logger := logging.Get()
+func (service *FileService) StoreImage(user string, buf []byte) (url string, mediaType string, err error) {
+	logger := service.lg
 	img := File{Uploader: user}
 
 	// digest []byte for filename
 	// conflict may not resolved
-	h := sha1.New()
-	// add datetime string to avoid conflict
-	h.Write([]byte(time.Now().Format(time.RFC3339)))
-	h.Write(buf)
-	digest := hex.EncodeToString(h.Sum(nil))
-	img.Filename = digest
+	img.Filename = digestToHex(buf)
 
 	// check image type
 	buffer := bytes.NewBuffer(buf)
 	_, t, e := image.Decode(buffer)
 	if e != nil {
-		err = newErr(ErrFile, "decode: "+e.Error())
-		logger.Error("[Files.Image] Cannot decode file to image", err)
-		return "", "", err
+		logger.Error("[Files.Image] Cannot decode file to image", e)
+		return "", "", ErrFile
 	}
 	switch t {
 	case "jpg":
@@ -47,9 +36,8 @@ func (service *FileService) StoreImage(user string, buf []byte) (url string, med
 	case "png":
 		img.Ext = TYPE_PNG
 	default:
-		err = newErr(ErrFile, "type: "+t)
-		logger.Error("[Files.Image] Wrong file type", err)
-		return "", "", err
+		logger.Error("[Files.Image] Wrong file type", errors.New("expect jpeg/png, got "+t))
+		return "", "", ErrFile
 	}
 
 	dst := fmt.Sprintf("%s/%s.%s",
@@ -59,9 +47,8 @@ func (service *FileService) StoreImage(user string, buf []byte) (url string, med
 	)
 
 	if e := service.storeFile(dst, buf); e != nil {
-		// handle error
 		logger.Error("[Files.Image] Cannot store image", e)
-		return "", "", e
+		return "", "", ErrFsInternal
 	}
 
 	url = fmt.Sprintf("%s/imgs/%s.%s", service.site, img.Filename, img.Ext)

@@ -1,34 +1,40 @@
 package posts
 
 import (
+	"fmt"
 	"time"
 	"unicode/utf8"
 
-	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func (service *PostService) Reply(username string, postID string, vsb string, content string, attachments []AttachImg) utils.Error {
+func (service *PostService) Reply(username, postID, vsb, content string, attachments []AttachImg) error {
+	logger := service.lg
 	if !service.user.IsUserExist(username) {
-		return newErr(ErrUserNotFound, username)
+		return ErrUserNotFound
 	}
 	if content == "" {
-		return newErr(ErrContent, "empty")
+		return ErrContentEmpty
 	}
 	if utf8.RuneCountInString(content) > service.maxContentLength {
-		return newErr(ErrContent, "too long")
+		return ErrContentTooLong
 	}
 
 	id := service.newID()
-	for service.db.IsPostExist(id) {
+	for service.db.Query.IsPostExist(id) {
 		id = service.newID()
 	}
 	url := service.getUrl(id)
 
 	v, ok := utils.GetVsb(vsb)
 	if !ok {
-		// get default
+		pf, err := service.user.GetPreferences(username)
+		if err != nil {
+			logger.Error("[Posts.Reply] Cannot get user preferences.", err)
+			return ErrInternal
+		}
+		v = pf.PostVsb
 	}
 
 	imgs := []models.Img{}
@@ -39,14 +45,18 @@ func (service *PostService) Reply(username string, postID string, vsb string, co
 		imgs = append(imgs, ToModelImg(v))
 	}
 
-	if e := service.db.SetPost(
-		id, url, username, time.Now(),
-		postID, v, content, imgs,
-	); e != nil {
-		switch {
-		case e.Code() == models.ErrNotFound && e.Error() == "post":
-			return newErr(ErrPostNotFound, postID)
-			// default:
+	p := models.Post{
+		ID: id, Url: url, User: username, Date: time.Now(),
+		Replying: postID, Vsb: v, Content: content,
+	}
+	if e := service.db.Set.SetPost(&p, imgs); e != nil {
+		switch e {
+		case models.ErrNotFound:
+			return ErrPostNotFound
+		default:
+			msg := fmt.Sprintf("[Posts.Reply] Cannot have %s reply to %s", username, postID)
+			logger.Error(msg, e)
+			return ErrInternal
 		}
 	}
 
@@ -54,12 +64,13 @@ func (service *PostService) Reply(username string, postID string, vsb string, co
 }
 
 // set replyings and replies of a post
-func (service *PostService) setReplies(post *Post) utils.Error {
-	logger := logging.Get()
-	rt, rs, e := service.db.QueryPostReplies(post.ID)
+func (service *PostService) setReplies(post *Post) error {
+	logger := service.lg
+	rt, rs, e := service.db.Query.QueryPostReplies(post.ID)
 	if e != nil {
-		logger.Error("[Posts.Reply] Cannot query replyings and replies of post", e)
-		return newErr(ErrPostNotFound, post.ID)
+		msg := fmt.Sprintf("[Posts.Reply] Cannot get replyings and replies of %s", post.ID)
+		logger.Error(msg, e)
+		return ErrPostNotFound
 	}
 
 	// replying to. as list

@@ -8,15 +8,15 @@ import (
 func Init() {
 	logger := logging.Get()
 	cfg := config.Get()
-	auth := AuthInstance()
+	auth := AuthInstance(logger)
 	logger.Info("[Models] Initailized AuthDb")
 	if cfg.Debug {
 		registerTestUsers(auth)
 		logger.Debug("[Models] registered test user accounts")
 	}
-	UserInstance()
+	UserInstance(logger)
 	logger.Info("[Models] Initailized UserDb")
-	PostInstance()
+	PostInstance(logger)
 	logger.Info("[Models] Initailized PostDb")
 }
 

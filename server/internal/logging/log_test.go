@@ -1,25 +1,15 @@
 package logging
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/kidommoc/gustrody/internal/config"
-	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 type T struct {
 	Field1 string  `json:"field1"`
 	Field2 float32 `json:"field2"`
-}
-
-type E struct {
-	utils.Err
-}
-
-const errcode utils.ErrCode = 0
-
-func (e E) CodeString() string {
-	return "errcode"
 }
 
 func TestShenllLogger(t *testing.T) {
@@ -32,7 +22,7 @@ func TestShenllLogger(t *testing.T) {
 		Field1: "test",
 		Field2: 42.42,
 	}
-	logger := Get(cfg)
+	logger, _ := Get(cfg).(*logger)
 	logger.level = 3
 	logger.Info("This is an info message")
 	logger.Info("This is an info with attachments",
@@ -42,10 +32,7 @@ func TestShenllLogger(t *testing.T) {
 		"obj", o,
 	)
 
-	e := E{
-		Err: utils.NewErr(errcode, "errmsg"),
-	}
-	logger.Error("This is an error message", e)
+	logger.Error("This is an error message", fmt.Errorf("errmsg"))
 }
 
 func TestFileLogger(t *testing.T) {
@@ -58,7 +45,7 @@ func TestFileLogger(t *testing.T) {
 		Field1: "test",
 		Field2: 42.42,
 	}
-	logger := Get(cfg)
+	logger, _ := Get(cfg).(*logger)
 	logger.level = 0
 	logger.Info("This is an info message")
 	logger.Info("This is an info with attachments",
@@ -68,8 +55,5 @@ func TestFileLogger(t *testing.T) {
 		"obj", o,
 	)
 
-	e := E{
-		Err: utils.NewErr(errcode, "errmsg"),
-	}
-	logger.Error("This is an error message", e)
+	logger.Error("This is an error message", fmt.Errorf("errmsg"))
 }

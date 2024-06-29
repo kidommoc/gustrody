@@ -5,24 +5,25 @@ import (
 
 	_db "github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 type IAuthDb interface {
-	QueryPasswordOfUser(username string) (password string, err utils.Error)
-	SetUserPassword(username string, password string) utils.Error
+	QueryPasswordOfUser(username string) (password string, err error)
+	SetUserPassword(username string, password string) error
 }
 
 type AuthDb struct {
+	lg   logging.Logger
 	pool *_db.ConnPool[*_db.RdConn]
 }
 
 var authIns *AuthDb = nil
 
-func AuthInstance() *AuthDb {
+func AuthInstance(lg logging.Logger) *AuthDb {
 	if authIns == nil {
 		authIns = &AuthDb{
-			pool: _db.AuthPool(),
+			lg:   lg,
+			pool: _db.AuthPool(nil, nil),
 		}
 	}
 	return authIns
@@ -35,28 +36,29 @@ func AuthInstance() *AuthDb {
 //   - DbInternal
 //   - NotFound "user"
 //   - Syntax "empty password"
-func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err utils.Error) {
-	logger := logging.Get()
+func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err error) {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Auth] Failed to open a connection", err)
-		return "", newErr(ErrDbInternal, err.Error())
+		return "", ErrDbInternal
 	}
 	defer conn.Close()
 
 	passwd, err := conn.Get("pswd:" + username)
 	if err != nil {
-		switch err.Code() {
+		switch err {
 		case _db.ErrNotFound:
 			msg := fmt.Sprintf("[Model.Auth] Cannot find user %s", username)
 			logger.Error(msg, err)
-			return "", newErr(ErrNotFound, "user")
+			return "", ErrNotFound
 		default:
-			return "", newErr(ErrDbInternal, err.Error())
+			logger.Error("[Model.Auth] Db error", err)
+			return "", ErrDbInternal
 		}
 	}
 	if passwd == "" {
-		return "", newErr(ErrSyntax, "empty password")
+		return "", ErrSyntax
 	}
 	return passwd, nil
 }
@@ -65,22 +67,22 @@ func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err uti
 //
 //   - DbInternal
 //   - Syntax "empty password"
-func (db *AuthDb) SetUserPassword(username string, password string) utils.Error {
+func (db *AuthDb) SetUserPassword(username, password string) error {
 	if password == "" {
-		return newErr(ErrSyntax, "empty password")
+		return ErrSyntax
 	}
 
-	logger := logging.Get()
+	logger := db.lg
 	conn, e := db.pool.Open()
 	if e != nil {
 		logger.Error("[Model.Auth] Failed to open a connection", e)
-		return newErr(ErrDbInternal, e.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 
 	if e := conn.SetString("pswd:"+username, password); e != nil {
 		logger.Error("[Model.Auth] Cannot set password", e)
-		return newErr(ErrDbInternal, e.Error())
+		return ErrDbInternal
 	}
 	return nil
 }

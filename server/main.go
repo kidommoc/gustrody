@@ -5,6 +5,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/router"
+	"github.com/kidommoc/gustrody/internal/services"
 
 	"fmt"
 
@@ -15,6 +16,7 @@ func main() {
 	config.Get()
 	db.Init()
 	models.Init()
+	services.Init()
 
 	app := fiber.New()
 	router.Route(app)

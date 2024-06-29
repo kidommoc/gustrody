@@ -2,12 +2,12 @@ package router
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/kidommoc/gustrody/internal/models"
-	"github.com/kidommoc/gustrody/internal/posts"
-	"github.com/kidommoc/gustrody/internal/users"
+	"github.com/kidommoc/gustrody/internal/services"
+	"github.com/kidommoc/gustrody/internal/services/posts"
 )
 
 func routePosts(router fiber.Router) {
@@ -45,11 +45,15 @@ func getPost(c *fiber.Ctx) error {
 		return c.SendString("Acquire post id.")
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	post, err := postService.Get(username, postID)
 	if err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrNotPermitted:
 			return c.SendStatus(fiber.StatusForbidden)
 		case posts.ErrPostNotFound:
@@ -81,11 +85,15 @@ func getPostLikes(c *fiber.Ctx) error {
 		return c.SendString("Acquire post id.")
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	list, err := postService.GetLikes(username, postID)
 	if err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrNotPermitted:
 			return c.SendStatus(fiber.StatusForbidden)
 		case posts.ErrPostNotFound:
@@ -114,11 +122,15 @@ func getPostShares(c *fiber.Ctx) error {
 		return c.SendString("Acquire post id.")
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	list, err := postService.GetShares(username, postID)
 	if err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrNotPermitted:
 			return c.SendStatus(fiber.StatusForbidden)
 		case posts.ErrPostNotFound:
@@ -153,24 +165,25 @@ func newPost(c *fiber.Ctx) error {
 		body.Attachments = []posts.AttachImg{}
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.New(
 		username, body.Vsb, body.Content, body.Attachments,
 	); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrUserNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Actor(User) not found.")
-		case posts.ErrContent:
-			switch err.Error() {
-			case "empty":
-				c.Status(fiber.StatusBadRequest)
-				return c.SendString("Acquire content to post.")
-			case "long":
-				c.Status(fiber.StatusBadRequest)
-				return c.SendString("Content is too long to post.")
-			}
+		case posts.ErrContentEmpty:
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Acquire content to post.")
+		case posts.ErrContentTooLong:
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Content is too long to post.")
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
@@ -198,28 +211,28 @@ func replyPost(c *fiber.Ctx) error {
 		return c.SendString("Wrong request body.")
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
-
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Reply(
 		username, postID, content.Vsb, content.Content, content.Attachments,
 	); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrUserNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Actor(User) not found.")
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
-		case posts.ErrContent:
-			switch err.Error() {
-			case "empty":
-				c.Status(fiber.StatusBadRequest)
-				return c.SendString("Acquire content to post.")
-			case "long":
-				c.Status(fiber.StatusBadRequest)
-				return c.SendString("Content is too long to post.")
-			}
+		case posts.ErrContentEmpty:
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Acquire content to post.")
+		case posts.ErrContentTooLong:
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Content is too long to post.")
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
@@ -247,27 +260,28 @@ func editPost(c *fiber.Ctx) error {
 		return c.SendString("Wrong request body.")
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Edit(
 		username, postID, content.Content, content.Attachments,
 	); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrOwner:
 			c.Status(fiber.StatusForbidden)
 			return c.SendString("Not post owner.")
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
-		case posts.ErrContent:
-			switch err.Error() {
-			case "empty":
-				c.Status(fiber.StatusBadRequest)
-				return c.SendString("Acquire content to post.")
-			case "long":
-				c.Status(fiber.StatusBadRequest)
-				return c.SendString("Content is too long to post.")
-			}
+		case posts.ErrContentEmpty:
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Acquire content to post.")
+		case posts.ErrContentTooLong:
+			c.Status(fiber.StatusBadRequest)
+			return c.SendString("Content is too long to post.")
 		default:
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
@@ -290,10 +304,14 @@ func removePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Remove(username, postID); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrOwner:
 			c.Status(fiber.StatusForbidden)
 			return c.SendString("Not post owner.")
@@ -322,10 +340,14 @@ func likePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Like(username, postID); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
@@ -351,10 +373,14 @@ func unlikePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Unlike(username, postID); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
@@ -384,10 +410,14 @@ func sharePost(c *fiber.Ctx) error {
 	}
 	vsb := c.Query("visibility")
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Share(username, postID, vsb); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")
@@ -413,10 +443,14 @@ func unsharePost(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	userService := users.NewService(models.UserInstance())
-	postService := posts.NewService(models.PostInstance(), userService)
+	var postService *posts.PostService
+	err := services.Get(reflect.ValueOf(&postService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	if err := postService.Unshare(username, postID); err != nil {
-		switch err.Code() {
+		switch err {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
 			return c.SendString("Post not found.")

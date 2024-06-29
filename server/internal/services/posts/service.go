@@ -3,8 +3,9 @@ package posts
 import (
 	"github.com/google/uuid"
 	"github.com/kidommoc/gustrody/internal/config"
+	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
-	"github.com/kidommoc/gustrody/internal/users"
+	"github.com/kidommoc/gustrody/internal/services/users"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
@@ -39,26 +40,29 @@ type Post struct {
 
 // services
 
+type PostDbs struct {
+	Query models.IPostQuery
+	Set   models.IPostSet
+	Like  models.IPostLike
+	Share models.IPostShare
+}
+
 type PostService struct {
+	lg               logging.Logger
 	site             string
 	maxContentLength int
 	maxImgInPost     int
-	db               models.IPostDb
+	db               PostDbs
 	user             *users.UserService
 }
 
-func NewService(db models.IPostDb, us *users.UserService, c ...config.Config) *PostService {
-	var cfg config.Config
-	if len(c) == 0 {
-		cfg = config.Get()
-	} else {
-		cfg = c[0]
-	}
+func NewService(us *users.UserService, dbs PostDbs, cfg config.Config, lg logging.Logger) *PostService {
 	return &PostService{
+		lg:               lg,
 		site:             cfg.Site,
 		maxContentLength: cfg.MaxContentLength,
 		maxImgInPost:     cfg.MaxImgInPost,
-		db:               db,
+		db:               dbs,
 		user:             us,
 	}
 }
@@ -71,14 +75,14 @@ func (service *PostService) getUrl(id string) string {
 	return service.site + "/posts/" + id
 }
 
-func (service *PostService) checkPermission(user string, target string, postID string, vsb utils.Vsb) bool {
+func (service *PostService) checkPermission(user, target, postID string, vsb utils.Vsb) bool {
 	switch vsb {
 	case utils.Vsb_FOLLOWER:
 		if user == "" || (user != target && !service.user.IsFollowing(user, target)) {
 			return false
 		}
 	case utils.Vsb_DIRECT:
-		//
+		// not implement yet
 	}
 	return true
 }

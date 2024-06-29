@@ -22,13 +22,15 @@ type PqConn struct {
 }
 
 type Tx struct {
+	lg logging.Logger
 	tx *sql.Tx
 }
 
-func newPqConn(client interface{}, pool *ConnPool[*PqConn]) (c *PqConn, ok bool) {
+func newPqConn(client interface{}, lg logging.Logger, pool *ConnPool[*PqConn]) (c *PqConn, ok bool) {
 	if client, ok := client.(*sql.DB); ok {
 		return &PqConn{
 			absConn: absConn[*PqConn]{
+				lg:   lg,
 				pool: pool,
 			},
 			client: client,
@@ -62,7 +64,13 @@ func exec(x X, q string, args ...any) (affected int64, err error) {
 }
 
 func (c *PqConn) Query(q string, args ...any) (rows *sql.Rows, err error) {
-	return c.client.Query(q, args...)
+	logger := c.lg
+	rows, err = c.client.Query(q, args...)
+	if err != nil {
+		logger.Error("[Db] Cannot query", err)
+		return nil, ErrDbInternal
+	}
+	return
 }
 
 func (c *PqConn) QueryOne(q string, args ...any) *sql.Row {
@@ -70,20 +78,34 @@ func (c *PqConn) QueryOne(q string, args ...any) *sql.Row {
 }
 
 func (c *PqConn) Exec(q string, args ...any) (affected int64, err error) {
-	return exec(c.client, q, args...)
+	logger := c.lg
+	affected, err = exec(c.client, q, args...)
+	if err != nil {
+		logger.Error("[Db] Cannot execute", err)
+		return 0, ErrDbInternal
+	}
+	return
 }
 
 func (c *PqConn) BeginTx() (tx *Tx, err error) {
+	logger := c.lg
 	t, e := c.client.Begin()
 	if e != nil {
-		return nil, e
+		logger.Error("[Db] Cannot start transaction", err)
+		return nil, ErrDbInternal
 	}
-	return &Tx{tx: t}, nil
+	return &Tx{lg: c.lg, tx: t}, nil
 }
 
 // CLOSE ROWS!
 func (t *Tx) Query(q string, args ...any) (rows *sql.Rows, err error) {
-	return t.tx.Query(q, args...)
+	logger := t.lg
+	rows, err = t.tx.Query(q, args...)
+	if err != nil {
+		logger.Error("[Db] Cannot query", err)
+		return nil, ErrDbInternal
+	}
+	return
 }
 
 func (t *Tx) QueryOne(q string, args ...any) *sql.Row {
@@ -91,19 +113,33 @@ func (t *Tx) QueryOne(q string, args ...any) *sql.Row {
 }
 
 func (t *Tx) Exec(q string, args ...any) (affected int64, err error) {
-	return exec(t.tx, q, args...)
+	logger := t.lg
+	affected, err = exec(t.tx, q, args...)
+	if err != nil {
+		logger.Error("[Db] Cannot execute", err)
+		return 0, ErrDbInternal
+	}
+	return
 }
 
-func (tx *Tx) Commit() error {
-	return tx.tx.Commit()
+func (t *Tx) Commit() error {
+	logger := t.lg
+	err := t.tx.Commit()
+	if err != nil {
+		logger.Error("[Db] Cannot commit transaction", err)
+		return ErrDbInternal
+	}
+	return nil
 }
 
-func newPqConnPool(cfg config.Config) *ConnPool[*PqConn] {
+func newPqConnPool(cfg config.Config, lg logging.Logger) *ConnPool[*PqConn] {
 	p := ConnPool[*PqConn]{
+		lg:       lg,
 		capacity: main_conn,
 		using:    0,
 		newConn:  newPqConn,
 	}
+	logger := lg
 
 	connStr := fmt.Sprintf(
 		"postgresql://%s:%s@%s/austrody?sslmode=disable", // db name: austrody
@@ -112,11 +148,10 @@ func newPqConnPool(cfg config.Config) *ConnPool[*PqConn] {
 	)
 	db, e := sql.Open("postgres", connStr)
 	if e != nil {
-		logger := logging.Get()
 		logger.Error("[Db.Postgres] Cannot create Postgres client", nil)
 		panic("Cannot create Postgres client")
 	}
-	db.SetMaxOpenConns(main_conn)
+	db.SetMaxOpenConns(2 * main_conn)
 	p.client = db
 	return &p
 }

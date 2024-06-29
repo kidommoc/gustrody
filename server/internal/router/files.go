@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/config"
-	"github.com/kidommoc/gustrody/internal/files"
 	"github.com/kidommoc/gustrody/internal/logging"
+	"github.com/kidommoc/gustrody/internal/services"
+	"github.com/kidommoc/gustrody/internal/services/files"
 )
 
 func routeFiles(router fiber.Router) {
@@ -50,7 +52,12 @@ func uploadImg(c *fiber.Ctx) error {
 		}
 	}
 
-	fileService := files.NewFileService()
+	var fileService *files.FileService
+	err := services.Get(reflect.ValueOf(&fileService).Elem())
+	if err != nil {
+		// ?
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
 	path, mediaType, e := fileService.StoreImage(username, b)
 	if e != nil {
 		c.Status(http.StatusInternalServerError)

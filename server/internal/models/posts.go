@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"strings"
 	"time"
@@ -16,7 +17,15 @@ import (
 
 type Img struct {
 	Url string `json:"url"`
-	Alt string `json:"alt"`
+	Alt string `json:"alt,omitempty"`
+}
+
+func (img Img) Value() (driver.Value, error) {
+	if img.Alt == "" {
+		return fmt.Sprintf("\"(%s,)\"", img.Url), nil
+	} else {
+		return fmt.Sprintf("\"(%s,%s)\"", img.Url, img.Alt), nil
+	}
 }
 
 func (img *Img) Scan(src interface{}) error {
@@ -36,80 +45,70 @@ func (img *Img) Scan(src interface{}) error {
 }
 
 type Post struct {
-	ID       string    `json:"id"`
-	Url      string    `json:"url"`
-	User     string    `json:"user"`
-	Date     time.Time `json:"date"`
-	Vsb      utils.Vsb `json:"vsb"`
-	Content  string    `json:"content"`
-	Media    []Img     `json:"media"`
-	Replying string    `json:"replying"` // post id
-	ReplyTo  string    `json:"replyTo"`  // user id, temporary field
-	SharedBy string    `json:"sharedBy"` // user id, temporary field
-	Likes    int64     `json:"likes"`    // count, temporary field
-	Shares   int64     `json:"shares"`   // count, temporary field
-	ActDate  string    `json:"actDate"`  // temporary field, used in sort
-	Level    int       `json:"level"`    // temporary field, used in replying and replies
+	ID       string           `json:"id"`
+	Url      string           `json:"url"`
+	User     string           `json:"user"`
+	Date     time.Time        `json:"date"`
+	Vsb      utils.Vsb        `json:"vsb"`
+	Content  string           `json:"content"`
+	Media    Array[Img, *Img] `json:"media"`    // magic but sucks
+	Replying string           `json:"replying"` // post id
+	ReplyTo  string           `json:"replyTo"`  // user id, temporary field
+	SharedBy string           `json:"sharedBy"` // user id, temporary field
+	Likes    int64            `json:"likes"`    // count, temporary field
+	Shares   int64            `json:"shares"`   // count, temporary field
+	ActDate  string           `json:"actDate"`  // temporary field, used in sort
+	Level    int              `json:"level"`    // temporary field, used in replying and replies
 }
 
 // db
 
-type IPostDb interface {
+type IPostQuery interface {
 	IsPostExist(id string) bool
-	QueryPostByID(id string) (post Post, err utils.Error)
-	QueryPostReplies(id string) (replyings []*Post, replies []*Post, err utils.Error)
-	QueryPostsAndSharesByUser(user string, asec bool) (list []*Post, err utils.Error)
-	SetPost(id string, url string, user string, date time.Time, replying string, vsb utils.Vsb, content string, attachments []Img) utils.Error
-	UpdatePost(id string, date time.Time, content string, attachments []Img) utils.Error
-	RemovePost(id string) utils.Error
-	QueryLikes(id string) (list []string, owner string, vsb utils.Vsb, err utils.Error)
-	SetLike(user string, id string) utils.Error
-	RemoveLike(user string, id string) utils.Error
-	QueryShares(id string) (list []string, owner string, vsb utils.Vsb, err utils.Error)
-	SetShare(user string, id string, date time.Time, vsb utils.Vsb) utils.Error
-	RemoveShare(user string, id string) utils.Error
+	QueryPostByID(id string) (post Post, err error)
+	QueryPostReplies(id string) (replyings []*Post, replies []*Post, err error)
+	QueryPostsAndSharesByUser(user string, asec bool) (list []*Post, err error)
+}
+
+type IPostSet interface {
+	SetPost(p *Post, attachments []Img) error
+	UpdatePost(p *Post, attachments []Img) error
+	RemovePost(id string) error
+}
+
+type IPostLike interface {
+	QueryLikes(id string) (list []string, owner string, vsb utils.Vsb, err error)
+	SetLike(user, id string) error
+	RemoveLike(user, id string) error
+}
+
+type IPostShare interface {
+	QueryShares(id string) (list []string, owner string, vsb utils.Vsb, err error)
+	SetShare(user, id string, date time.Time, vsb utils.Vsb) error
+	RemoveShare(user, id string) error
 }
 
 type PostDb struct {
+	lg   logging.Logger
 	pool *_db.ConnPool[*_db.PqConn]
 }
 
-var postsIns *PostDb = nil
+var postIns *PostDb = nil
 
-func PostInstance() *PostDb {
-	if postsIns == nil {
-		postsIns = &PostDb{
-			pool: _db.MainPool(),
+func PostInstance(lg logging.Logger) *PostDb {
+	if postIns == nil {
+		postIns = &PostDb{
+			lg:   lg,
+			pool: _db.MainPool(nil, nil),
 		}
 	}
-	return postsIns
+	return postIns
 }
 
 // functions
 
-// q: query string, l: array length, t: array type in postgresql
-// tpl: template function (int start, int i) string
-func insertArray(q string, tpl func(int, int) string, l int, start int, t ...string) string {
-	if l == 0 {
-		return fmt.Sprintf(q, "NULL")
-	}
-	s := make([]string, 0, l)
-	for i := 0; i < l; i += 1 {
-		s = append(s, tpl(start, i))
-	}
-	str := fmt.Sprintf("ARRAY[%s]", strings.Join(s, ", "))
-	if len(t) != 0 {
-		str += fmt.Sprintf("::%s[]", t[0])
-	}
-	return fmt.Sprintf(q, str)
-}
-
-func imgArrTemplate(start int, i int) string {
-	return fmt.Sprintf("($%d, $%d)", start+i*2, start+i*2+1)
-}
-
 func (db *PostDb) IsPostExist(id string) bool {
-	logger := logging.Get()
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Posts] Failed to open a connection", err)
@@ -127,7 +126,7 @@ func (db *PostDb) IsPostExist(id string) bool {
 		case sql.ErrNoRows:
 			return false
 		default:
-			logger.Error("[Model.Posts] Cannot query", newErr(ErrDbInternal, e.Error()))
+			logger.Error("[Model.Posts] Cannot query", e)
 			return false
 		}
 	}
@@ -138,12 +137,12 @@ func (db *PostDb) IsPostExist(id string) bool {
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) QueryPostByID(id string) (post Post, err utils.Error) {
-	logger := logging.Get()
+func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return post, newErr(ErrDbInternal, err.Error())
+		return post, ErrDbInternal
 	}
 	defer conn.Close()
 
@@ -153,23 +152,22 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err utils.Error) {
 			  CARDINALITY("likes") as "likes",
 			  CARDINALITY("shares") as "shares"
 			FROM posts
-			WHERE "id" = {postID};`
+			WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
 
 	post = Post{}
 	var vsb string
 	if e := r.Scan(
 		&post.ID, &post.Url, &post.User, &post.Date,
-		&vsb, &post.Content, pq.Array(&post.Media),
+		&vsb, &post.Content, post.Media.ToPqArray(),
 		&post.Likes, &post.Shares,
 	); e != nil {
 		switch e {
 		case sql.ErrNoRows:
-			return post, newErr(ErrNotFound, "post")
+			return post, ErrNotFound
 		default:
-			err = newErr(ErrDbInternal, e.Error())
-			logger.Error("[Model.Posts] Cannot scan row", err)
-			return post, err
+			logger.Error("[Model.Posts] Cannot scan row", e)
+			return post, ErrDbInternal
 		}
 	}
 	post.Vsb, _ = utils.GetVsb(vsb)
@@ -180,16 +178,16 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err utils.Error) {
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Post, err utils.Error) {
-	logger := logging.Get()
+func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Post, err error) {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Reply] Failed to open a connection", err)
-		return nil, nil, newErr(ErrDbInternal, err.Error())
+		return nil, nil, ErrDbInternal
 	}
 	defer conn.Close()
 	if !db.IsPostExist(id) {
-		return nil, nil, newErr(ErrNotFound, "post")
+		return nil, nil, ErrNotFound
 	}
 
 	qs := ` WITH RECURSIVE rt AS (
@@ -212,7 +210,8 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 	`
 	r, e := conn.Query(qs, id)
 	if e != nil {
-		return nil, nil, newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Cannot query", e)
+		return nil, nil, ErrDbInternal
 	}
 
 	replyings = make([]*Post, 0)
@@ -222,11 +221,11 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, pq.Array(&p.Media),
+			&vsb, &p.Content, p.Media.ToPqArray(),
 			&p.Likes, &p.Shares,
 			&rpy, &p.Level,
 		); e != nil {
-			logger.Error("[Model.Reply] Cannot scan row", newErr(ErrDbInternal, e.Error()))
+			logger.Error("[Model.Reply] Cannot scan row", e)
 			continue
 		}
 		if rpy.Valid {
@@ -256,7 +255,8 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 	`
 	r, e = conn.Query(qs, id)
 	if e != nil {
-		return nil, nil, newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Cannot query", e)
+		return nil, nil, ErrDbInternal
 	}
 	replies = make([]*Post, 0)
 	for r.Next() {
@@ -265,11 +265,11 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, pq.Array(&p.Media),
+			&vsb, &p.Content, p.Media.ToPqArray(),
 			&p.Likes, &p.Shares,
 			&rpy, &p.Level,
 		); e != nil {
-			logger.Error("[Model.Reply] Cannot scan row", newErr(ErrDbInternal, e.Error()))
+			logger.Error("[Model.Reply] Cannot scan row", e)
 			continue
 		}
 		if rpy.Valid {
@@ -285,12 +285,12 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 // ERRORS
 //
 //   - DbInternal
-func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post, err utils.Error) {
-	logger := logging.Get()
+func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post, err error) {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return nil, newErr(ErrDbInternal, err.Error())
+		return nil, ErrDbInternal
 	}
 	defer conn.Close()
 
@@ -336,7 +336,8 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 	}
 	r, e := conn.Query(qs, user)
 	if e != nil {
-		return nil, newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Cannot query", e)
+		return nil, ErrDbInternal
 	}
 	list = make([]*Post, 0)
 	for r.Next() {
@@ -346,11 +347,11 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, pq.Array(&p.Media),
+			&vsb, &p.Content, p.Media.ToPqArray(),
 			&p.Likes, &p.Shares,
 			&rpt, &shb, &p.ActDate,
 		); e != nil {
-			logger.Error("[Model.Posts] Cannot scan row", newErr(ErrDbInternal, e.Error()))
+			logger.Error("[Model.Posts] Cannot scan row", e)
 			continue
 		}
 		if rpt.Valid {
@@ -369,19 +370,16 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 //
 //   - DbInternal
 //   - Dunplicate "post"
-func (db *PostDb) SetPost(
-	id string, url string, user string, date time.Time,
-	replying string, vsb utils.Vsb, content string, attachments []Img,
-) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) SetPost(p *Post, attachments []Img) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
-	if replying != "" && !db.IsPostExist(replying) {
-		return newErr(ErrNotFound, "replying")
+	if p.Replying != "" && !db.IsPostExist(p.Replying) {
+		return ErrNotFound
 	}
 
 	qs := ` INSERT INTO posts(
@@ -392,31 +390,20 @@ func (db *PostDb) SetPost(
 			VALUES (
 			  $1, $2, $3, $4,
 			  $5, $6, $7,
-			  %s
+			  $8
 			);`
-	qs = insertArray(qs, imgArrTemplate, len(attachments), 8, "img")
-	args := make([]interface{}, 0, 7+2*len(attachments))
-	args = append(args, id)
-	args = append(args, url)
-	args = append(args, user)
-	args = append(args, date)
-	if replying == "" {
-		args = append(args, nil)
-	} else {
-		args = append(args, replying)
-	}
-	args = append(args, string(vsb))
-	args = append(args, content)
-	for _, v := range attachments {
-		args = append(args, v.Url)
-		args = append(args, v.Alt)
-	}
-	r, e := conn.Exec(qs, args...)
+	p.Date = p.Date.UTC()
+	r, e := conn.Exec(qs,
+		p.ID, p.Url, p.User, p.Date,
+		p.Replying, p.Vsb.String(), p.Content,
+		NewArray(attachments, logger),
+	)
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Posts] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrDunplicate, "post")
+		return ErrDunplicate
 	}
 	return nil
 }
@@ -425,35 +412,28 @@ func (db *PostDb) SetPost(
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) UpdatePost(id string, date time.Time, content string, attachments []Img) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) UpdatePost(p *Post, attachments []Img) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 
 	qs := ` UPDATE posts
 			SET
-			  "date" = $1, "content" = $2,
-			  "media" = %s
-			WHERE "id" = $3;`
-	qs = insertArray(qs, imgArrTemplate, len(attachments), 4, "img")
-	args := make([]interface{}, 0, 3+2*len(attachments))
-	args = append(args, date)
-	args = append(args, content)
-	args = append(args, id)
-	for _, v := range attachments {
-		args = append(args, v.Url)
-		args = append(args, v.Alt)
-	}
-	r, e := conn.Exec(qs, args...)
+			  "date" = $2, "content" = $3,
+			  "media" = $4
+			WHERE "id" = $1;`
+	p.Date = p.Date.UTC()
+	r, e := conn.Exec(qs, p.ID, p.Date, p.Content, NewArray(attachments, logger))
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 	return nil
 }
@@ -462,26 +442,27 @@ func (db *PostDb) UpdatePost(id string, date time.Time, content string, attachme
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) RemovePost(id string) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) RemovePost(id string) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 	if !db.IsPostExist(id) {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 
 	qs := ` DELETE FROM posts
 			WHERE "id" = $1;`
 	r, e := conn.Exec(qs, id)
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 	return nil
 }
@@ -490,12 +471,12 @@ func (db *PostDb) RemovePost(id string) utils.Error {
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) QueryLikes(id string) (list []string, owner string, vsb utils.Vsb, err utils.Error) {
-	logger := logging.Get()
+func (db *PostDb) QueryLikes(id string) (list []string, owner string, vsb utils.Vsb, err error) {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model] Failed to open a connection", err)
-		return nil, "", vsb, newErr(ErrDbInternal, err.Error())
+		return nil, "", vsb, ErrDbInternal
 	}
 	defer conn.Close()
 
@@ -510,11 +491,10 @@ func (db *PostDb) QueryLikes(id string) (list []string, owner string, vsb utils.
 	if e != nil {
 		switch e {
 		case sql.ErrNoRows:
-			return nil, u, vsb, newErr(ErrNotFound, "post")
+			return nil, u, vsb, ErrNotFound
 		default:
-			err = newErr(ErrDbInternal, e.Error())
-			logger.Error("[Model.Like] Cannot scan row", err)
-			return nil, "", vsb, err
+			logger.Error("[Model.Like] Cannot scan row", e)
+			return nil, "", vsb, ErrDbInternal
 		}
 	}
 	return list, u, vsb, nil
@@ -525,16 +505,16 @@ func (db *PostDb) QueryLikes(id string) (list []string, owner string, vsb utils.
 //   - DbInternal
 //   - NotFound "post"
 //   - Dunplicate "like"
-func (db *PostDb) SetLike(user string, id string) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) SetLike(user, id string) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Like] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 	if !db.IsPostExist(id) {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 
 	qs := ` UPDATE posts
@@ -544,10 +524,11 @@ func (db *PostDb) SetLike(user string, id string) utils.Error {
   			  AND ARRAY_POSITION("likes", $1) IS NULL;`
 	r, e := conn.Exec(qs, user, id)
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrDunplicate, "like")
+		return ErrDunplicate
 	}
 	return nil
 }
@@ -556,12 +537,12 @@ func (db *PostDb) SetLike(user string, id string) utils.Error {
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) RemoveLike(user string, id string) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) RemoveLike(user, id string) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Like] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 
@@ -570,10 +551,11 @@ func (db *PostDb) RemoveLike(user string, id string) utils.Error {
 			WHERE "id" = $2;`
 	r, e := conn.Exec(qs, user, id)
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 	return nil
 }
@@ -582,12 +564,12 @@ func (db *PostDb) RemoveLike(user string, id string) utils.Error {
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) QueryShares(id string) (list []string, owner string, vsb utils.Vsb, err utils.Error) {
-	logger := logging.Get()
+func (db *PostDb) QueryShares(id string) (list []string, owner string, vsb utils.Vsb, err error) {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Share] Failed to open a connection", err)
-		return nil, "", vsb, newErr(ErrDbInternal, err.Error())
+		return nil, "", vsb, ErrDbInternal
 	}
 	defer conn.Close()
 
@@ -602,11 +584,10 @@ func (db *PostDb) QueryShares(id string) (list []string, owner string, vsb utils
 	if e != nil {
 		switch e {
 		case sql.ErrNoRows:
-			return nil, u, vsb, newErr(ErrNotFound)
+			return nil, u, vsb, ErrNotFound
 		default:
-			err = newErr(ErrDbInternal, e.Error())
-			logger.Error("[Model.Like] Cannot scan row", err)
-			return nil, "", vsb, err
+			logger.Error("[Model.Like] Cannot scan row", e)
+			return nil, "", vsb, ErrDbInternal
 		}
 	}
 	return list, u, vsb, nil
@@ -617,21 +598,22 @@ func (db *PostDb) QueryShares(id string) (list []string, owner string, vsb utils
 //   - DbInternal
 //   - NotFound "post"
 //   - Dunplicate "share"
-func (db *PostDb) SetShare(user string, id string, date time.Time, vsb utils.Vsb) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) SetShare(user, id string, date time.Time, vsb utils.Vsb) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Share] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 	if !db.IsPostExist(id) {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 
 	tx, e := conn.BeginTx()
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Share] Cannot start transaction", e)
+		return ErrDbInternal
 	}
 
 	// update posts.shares
@@ -643,25 +625,28 @@ func (db *PostDb) SetShare(user string, id string, date time.Time, vsb utils.Vsb
 	`
 	r, e := tx.Exec(qs, user, id)
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrDunplicate, "share")
+		return ErrDunplicate
 	}
 
 	// insert into shares
 	qs = `  INSERT INTO shares("user", "id", "date", "vsb")
 			VALUES ($1, $2, $3, $4);`
-	_, e = tx.Exec(qs, user, id, date, string(vsb))
+	_, e = tx.Exec(qs, user, id, date, vsb.String())
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Failed to execute", e)
+		return ErrDbInternal
 	}
 	if r == 0 {
-		return newErr(ErrDunplicate, "share")
+		return ErrDunplicate
 	}
 
 	if e := tx.Commit(); e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Cannot commit", e)
+		return ErrDbInternal
 	}
 	return nil
 }
@@ -670,61 +655,63 @@ func (db *PostDb) SetShare(user string, id string, date time.Time, vsb utils.Vsb
 //
 //   - DbInternal
 //   - NotFound "post", "share"
-func (db *PostDb) RemoveShare(user string, id string) utils.Error {
-	logger := logging.Get()
+func (db *PostDb) RemoveShare(user, id string) error {
+	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
 		logger.Error("[Model.Share] Failed to open a connection", err)
-		return newErr(ErrDbInternal, err.Error())
+		return ErrDbInternal
 	}
 	defer conn.Close()
 	if !db.IsPostExist(id) {
-		return newErr(ErrNotFound, "post")
+		return ErrNotFound
 	}
 
 	tx, e := conn.BeginTx()
 	if e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Share] Cannot start transaction", e)
+		return ErrDbInternal
 	}
 
 	// use 2 annoymous func to ensure completely deletion
 
-	err1 := func() utils.Error {
+	err1 := func() error {
 		qs := ` UPDATE posts
 				SET "shares" = ARRAY_REMOVE("shares", $1)
 				WHERE "id" = $2;
 		`
 		r, e := tx.Exec(qs, user, id)
 		if e != nil {
-			logger.Error("[Model.Share] Failed to exec", newErr(ErrDbInternal, e.Error()))
-			return newErr(ErrDbInternal, e.Error())
+			logger.Error("[Model.Share] Failed to exec", e)
+			return ErrDbInternal
 		}
 		if r == 0 {
-			return newErr(ErrNotFound)
+			return ErrNotFound
 		}
 		return nil
 	}()
 
-	err2 := func() utils.Error {
+	err2 := func() error {
 		qs := ` DELETE FROM shares
 				WHERE "user" = $1 and "id" = $2;`
 		r, e := tx.Exec(qs, user, id)
 		if e != nil {
-			logger.Error("[Model.Share] Failed to exec", newErr(ErrDbInternal, e.Error()))
-			return newErr(ErrDbInternal, e.Error())
+			logger.Error("[Model.Share] Failed to exec", e)
+			return ErrDbInternal
 		}
 		if r == 0 {
-			return newErr(ErrNotFound)
+			return ErrNotFound
 		}
 		return nil
 	}()
 
 	if e := tx.Commit(); e != nil {
-		return newErr(ErrDbInternal, e.Error())
+		logger.Error("[Model.Reply] Cannot commit", e)
+		return ErrDbInternal
 	}
 
 	if err1 != nil || err2 != nil {
-		return newErr(ErrNotFound, "share")
+		return ErrNotFound
 	} else {
 		return nil
 	}
