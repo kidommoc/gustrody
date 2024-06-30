@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kidommoc/gustrody/internal/config"
@@ -105,6 +106,7 @@ type Logger interface {
 }
 
 type logger struct {
+	mutex       *sync.Mutex
 	path        string
 	date        string
 	level       logLevel
@@ -118,11 +120,11 @@ type logger struct {
 var instance *logger = nil
 
 func (l *logger) update() {
-	if l.split == split_none && l.fileLogger != nil { // don't split, update is not required
+	if l.split == split_none && l.fileLogger != nil { // not split, no need to update
 		return
 	}
 	date := time.Now().Format(time.DateOnly)
-	if date == l.date && l.fileLogger != nil { // same date, update is not required
+	if date == l.date && l.fileLogger != nil { // same date, no need to update
 		return
 	}
 
@@ -173,6 +175,7 @@ func Get(c ...config.Config) Logger {
 		cfg = c[0]
 	}
 	l := logger{
+		mutex: &sync.Mutex{},
 		path:  cfg.Logfile,
 		level: levels[cfg.LogLevel],
 		split: splits[cfg.LogSplit],
@@ -203,29 +206,36 @@ func handleAttrs(attrs ...any) []any {
 }
 
 func (l *logger) Debug(msg string, attach ...any) {
+	l.mutex.Lock()
 	// shell
 	l.shellLogger.Debug(msg, handleAttrs(attach...)...)
+	l.mutex.Unlock()
 }
 
 func (l *logger) Info(msg string, attach ...any) {
+	l.mutex.Lock()
 	if l.level <= level_info { // file
 		l.update()
 		l.fileLogger.Info(msg, handleAttrs(attach...)...)
 	} else { // shell
 		l.shellLogger.Info(msg, handleAttrs(attach...)...)
 	}
+	l.mutex.Unlock()
 }
 
 func (l *logger) Warning(msg string, attach ...any) {
+	l.mutex.Lock()
 	if l.level <= level_warning {
 		l.update()
 		l.fileLogger.Warn(msg, handleAttrs(attach...)...)
 	} else {
 		l.shellLogger.Warn(msg, handleAttrs(attach...)...)
 	}
+	l.mutex.Unlock()
 }
 
 func (l *logger) Error(msg string, err error) {
+	l.mutex.Lock()
 	if l.level <= level_error {
 		l.update()
 		if err == nil {
@@ -244,4 +254,5 @@ func (l *logger) Error(msg string, err error) {
 			)
 		}
 	}
+	l.mutex.Unlock()
 }

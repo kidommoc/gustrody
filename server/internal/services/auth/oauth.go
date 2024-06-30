@@ -102,6 +102,7 @@ func (service *OauthService) Login(username, password string) (session string, o
 	if err != nil {
 		return "", oauth, ErrUserNotFound
 	}
+	password = string(utils.SHA256Hash(password))
 	if p != password {
 		return "", oauth, ErrWrongPassword
 	}

@@ -3,6 +3,7 @@ package models
 import (
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/logging"
+	"github.com/kidommoc/gustrody/internal/utils"
 )
 
 func Init() {
@@ -22,15 +23,16 @@ func Init() {
 
 func registerTestUsers(db IAuthDb) {
 	logger := logging.Get()
-	e := db.SetUserPassword("u1", "penguin")
+	pwd := string(utils.SHA256Hash("penguin"))
+	e := db.SetUserPassword("u1", pwd)
 	if e != nil {
 		logger.Error("when init u1", e)
 	}
-	e = db.SetUserPassword("u2", "penguin")
+	e = db.SetUserPassword("u2", pwd)
 	if e != nil {
 		logger.Error("when init u1", e)
 	}
-	e = db.SetUserPassword("u3", "penguin")
+	e = db.SetUserPassword("u3", pwd)
 	if e != nil {
 		logger.Error("when init u1", e)
 	}
