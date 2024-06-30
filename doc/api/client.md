@@ -169,7 +169,7 @@ Edit *my* profile.
 [HEADER]Refresh:
 ```
 
-### GET `/users/settings`
+### GET `/users/preferences`
 
 Get *my* user settings to edit.
 
@@ -189,14 +189,14 @@ Get *my* user settings to edit.
 [HEADER]Refresh:
 {
   "locked": true,
-  "postVsb": "string(enum)",
-  "shareVsb": "string(enum)"
+  "postVsb": "vsb",
+  "shareVsb": "vsb"
 }
 ```
 
-### POST `/users/settings`
+### POST `/users/preferences`
 
-Edit *my* user settings.
+Edit *my* user preferences.
 
 - REQUEST
 
@@ -206,8 +206,8 @@ Edit *my* user settings.
 [HEADER]Authorization: Bearer (REQUIRED)
 {
   "locked": true,
-  "postVsb": "string(enum)",
-  "shareVsb": "string(enum)"
+  "postVsb": "vsb",
+  "shareVsb": "vsb"
 }
 ```
 
