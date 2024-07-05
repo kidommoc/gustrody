@@ -16,16 +16,21 @@ const (
 var redis_conn = []int{2}
 var redis_port = []int{6739}
 
-type RdConn struct {
-	absConn[*RdConn]
+type RdConn interface {
+	Conn
+	Get(key string) (result string, err error)
+	SetString(key string, value string) error
+}
+
+type rdConn struct {
+	absConn[RdConn]
 	client *redis.Client
 }
 
-func newRdConn(client interface{}, lg logging.Logger, pool *ConnPool[*RdConn]) (c *RdConn, ok bool) {
+func newRdConn(client interface{}, pool *connPool[RdConn]) (c RdConn, ok bool) {
 	if client, ok := client.(*redis.Client); ok {
-		return &RdConn{
-			absConn: absConn[*RdConn]{
-				lg:   lg,
+		return &rdConn{
+			absConn: absConn[RdConn]{
 				pool: pool,
 			},
 			client: client,
@@ -34,7 +39,7 @@ func newRdConn(client interface{}, lg logging.Logger, pool *ConnPool[*RdConn]) (
 	return nil, false
 }
 
-func (c *RdConn) Close() {
+func (c *rdConn) Close() {
 	if c.client == nil {
 		return
 	}
@@ -42,8 +47,8 @@ func (c *RdConn) Close() {
 	c.absConn.close()
 }
 
-func (c *RdConn) Get(key string) (result string, err error) {
-	logger := c.lg
+func (c *rdConn) Get(key string) (result string, err error) {
+	logger := logging.Get()
 	if c.client == nil {
 		logger.Error("[Model.Redis] Connection is closed.", nil)
 		return "", ErrConnClosed
@@ -60,8 +65,8 @@ func (c *RdConn) Get(key string) (result string, err error) {
 	return result, nil
 }
 
-func (c *RdConn) SetString(key string, value string) error {
-	logger := c.lg
+func (c *rdConn) SetString(key string, value string) error {
+	logger := logging.Get()
 	if c.client == nil {
 		logger.Error("[Model.Redis] Connection is closed.", nil)
 		return ErrConnClosed
@@ -73,14 +78,13 @@ func (c *RdConn) SetString(key string, value string) error {
 	return nil
 }
 
-func newRdConnPool(cfg config.Config, lg logging.Logger, db int) *ConnPool[*RdConn] {
-	p := ConnPool[*RdConn]{
-		lg:       lg,
+func newRdConnPool(cfg config.Config, db int) *connPool[RdConn] {
+	p := connPool[RdConn]{
 		capacity: redis_conn[db],
 		using:    0,
 		newConn:  newRdConn,
 	}
-	logger := lg
+	logger := logging.Get()
 
 	client := redis.NewClient(&redis.Options{
 		Addr: func(db int) string {

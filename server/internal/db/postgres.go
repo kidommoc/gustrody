@@ -16,21 +16,34 @@ const (
 	main_conn int = 12
 )
 
-type PqConn struct {
-	absConn[*PqConn]
+type PqConn interface {
+	Conn
+	Query(q string, args ...any) (rows *sql.Rows, err error)
+	QueryOne(q string, args ...any) *sql.Row
+	Exec(q string, args ...any) (affected int64, err error)
+	BeginTx() (tx Tx, err error)
+}
+
+type pqConn struct {
+	absConn[PqConn]
 	client *sql.DB
 }
 
-type Tx struct {
-	lg logging.Logger
+type Tx interface {
+	Query(q string, args ...any) (rows *sql.Rows, err error)
+	QueryOne(q string, args ...any) *sql.Row
+	Exec(q string, args ...any) (affected int64, err error)
+	Commit() error
+}
+
+type tx struct {
 	tx *sql.Tx
 }
 
-func newPqConn(client interface{}, lg logging.Logger, pool *ConnPool[*PqConn]) (c *PqConn, ok bool) {
+func newPqConn(client interface{}, pool *connPool[PqConn]) (c PqConn, ok bool) {
 	if client, ok := client.(*sql.DB); ok {
-		return &PqConn{
-			absConn: absConn[*PqConn]{
-				lg:   lg,
+		return &pqConn{
+			absConn: absConn[PqConn]{
 				pool: pool,
 			},
 			client: client,
@@ -39,7 +52,7 @@ func newPqConn(client interface{}, lg logging.Logger, pool *ConnPool[*PqConn]) (
 	return nil, false
 }
 
-func (c *PqConn) Close() {
+func (c *pqConn) Close() {
 	if c.client == nil {
 		return
 	}
@@ -63,8 +76,8 @@ func exec(x X, q string, args ...any) (affected int64, err error) {
 	return r.RowsAffected()
 }
 
-func (c *PqConn) Query(q string, args ...any) (rows *sql.Rows, err error) {
-	logger := c.lg
+func (c *pqConn) Query(q string, args ...any) (rows *sql.Rows, err error) {
+	logger := logging.Get()
 	rows, err = c.client.Query(q, args...)
 	if err != nil {
 		logger.Error("[Db] Cannot query", err)
@@ -73,12 +86,12 @@ func (c *PqConn) Query(q string, args ...any) (rows *sql.Rows, err error) {
 	return
 }
 
-func (c *PqConn) QueryOne(q string, args ...any) *sql.Row {
+func (c *pqConn) QueryOne(q string, args ...any) *sql.Row {
 	return c.client.QueryRow(q, args...)
 }
 
-func (c *PqConn) Exec(q string, args ...any) (affected int64, err error) {
-	logger := c.lg
+func (c *pqConn) Exec(q string, args ...any) (affected int64, err error) {
+	logger := logging.Get()
 	affected, err = exec(c.client, q, args...)
 	if err != nil {
 		logger.Error("[Db] Cannot execute", err)
@@ -87,19 +100,19 @@ func (c *PqConn) Exec(q string, args ...any) (affected int64, err error) {
 	return
 }
 
-func (c *PqConn) BeginTx() (tx *Tx, err error) {
-	logger := c.lg
-	t, e := c.client.Begin()
+func (c *pqConn) BeginTx() (t Tx, err error) {
+	logger := logging.Get()
+	tt, e := c.client.Begin()
 	if e != nil {
 		logger.Error("[Db] Cannot start transaction", err)
 		return nil, ErrDbInternal
 	}
-	return &Tx{lg: c.lg, tx: t}, nil
+	return &tx{tt}, nil
 }
 
 // CLOSE ROWS!
-func (t *Tx) Query(q string, args ...any) (rows *sql.Rows, err error) {
-	logger := t.lg
+func (t *tx) Query(q string, args ...any) (rows *sql.Rows, err error) {
+	logger := logging.Get()
 	rows, err = t.tx.Query(q, args...)
 	if err != nil {
 		logger.Error("[Db] Cannot query", err)
@@ -108,12 +121,12 @@ func (t *Tx) Query(q string, args ...any) (rows *sql.Rows, err error) {
 	return
 }
 
-func (t *Tx) QueryOne(q string, args ...any) *sql.Row {
+func (t *tx) QueryOne(q string, args ...any) *sql.Row {
 	return t.tx.QueryRow(q, args...)
 }
 
-func (t *Tx) Exec(q string, args ...any) (affected int64, err error) {
-	logger := t.lg
+func (t *tx) Exec(q string, args ...any) (affected int64, err error) {
+	logger := logging.Get()
 	affected, err = exec(t.tx, q, args...)
 	if err != nil {
 		logger.Error("[Db] Cannot execute", err)
@@ -122,8 +135,8 @@ func (t *Tx) Exec(q string, args ...any) (affected int64, err error) {
 	return
 }
 
-func (t *Tx) Commit() error {
-	logger := t.lg
+func (t *tx) Commit() error {
+	logger := logging.Get()
 	err := t.tx.Commit()
 	if err != nil {
 		logger.Error("[Db] Cannot commit transaction", err)
@@ -132,14 +145,13 @@ func (t *Tx) Commit() error {
 	return nil
 }
 
-func newPqConnPool(cfg config.Config, lg logging.Logger) *ConnPool[*PqConn] {
-	p := ConnPool[*PqConn]{
-		lg:       lg,
+func newPqConnPool(cfg config.Config) *connPool[PqConn] {
+	p := connPool[PqConn]{
 		capacity: main_conn,
 		using:    0,
 		newConn:  newPqConn,
 	}
-	logger := lg
+	logger := logging.Get()
 
 	connStr := fmt.Sprintf(
 		"postgresql://%s:%s@%s/austrody?sslmode=disable", // db name: austrody

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/kidommoc/gustrody/internal/config"
@@ -20,12 +21,13 @@ type Conn interface {
 }
 
 type absConn[C Conn] struct {
-	lg   logging.Logger
-	pool *ConnPool[C]
+	pool *connPool[C]
 }
 
 func (c *absConn[C]) close() {
 	c.pool.mu.Lock()
+	logger := logging.Get()
+	logger.Debug(fmt.Sprintf("closed, using: %d", c.pool.using))
 	if c.pool.using > 0 {
 		c.pool.using -= 1
 	}
@@ -45,18 +47,21 @@ func (c *absConn[C]) Closed() bool {
 
 // connection pool
 
-type ConnPool[C Conn] struct {
+type ConnPool[C Conn] interface {
+	Open() (conn C, err error)
+}
+
+type connPool[C Conn] struct {
 	mu       sync.Mutex
 	listener []chan bool
-	lg       logging.Logger
 	capacity int
 	using    int
 	client   interface{}
-	newConn  func(interface{}, logging.Logger, *ConnPool[C]) (C, bool)
+	newConn  func(interface{}, *connPool[C]) (C, bool)
 }
 
 // should be async
-func (p *ConnPool[C]) Open() (c C, err error) {
+func (p *connPool[C]) Open() (conn C, err error) {
 	p.mu.Lock()
 	if p.using >= p.capacity {
 		sig := make(chan bool)
@@ -64,7 +69,7 @@ func (p *ConnPool[C]) Open() (c C, err error) {
 		p.mu.Unlock()
 		<-sig
 	}
-	c, ok := p.newConn(p.client, p.lg, p)
+	c, ok := p.newConn(p.client, p)
 	if !ok {
 		p.mu.Unlock()
 		return c, ErrNoConn
@@ -76,39 +81,39 @@ func (p *ConnPool[C]) Open() (c C, err error) {
 
 // auth pool
 
-var authPoolIns *ConnPool[*RdConn] = nil
+var authPoolIns *connPool[RdConn] = nil
 
-func AuthPool(cfg *config.Config, lg logging.Logger) *ConnPool[*RdConn] {
+func AuthPool(cfg *config.Config) ConnPool[RdConn] {
 	if authPoolIns != nil {
 		return authPoolIns
 	}
-	if cfg == nil || lg == nil {
+	if cfg == nil {
 		return nil
 	}
-	authPoolIns = newRdConnPool(*cfg, lg, redis_auth)
+	authPoolIns = newRdConnPool(*cfg, redis_auth)
 	return authPoolIns
 }
 
 // main pool
 
-var mainPoolIns *ConnPool[*PqConn] = nil
+var mainPoolIns *connPool[PqConn] = nil
 
-func MainPool(cfg *config.Config, lg logging.Logger) *ConnPool[*PqConn] {
+func MainPool(cfg *config.Config) ConnPool[PqConn] {
 	if mainPoolIns != nil {
 		return mainPoolIns
 	}
-	if cfg == nil || lg == nil {
+	if cfg == nil {
 		return nil
 	}
-	mainPoolIns = newPqConnPool(*cfg, lg)
+	mainPoolIns = newPqConnPool(*cfg)
 	return mainPoolIns
 }
 
 func Init() {
 	cfg := config.Get()
 	logger := logging.Get()
-	AuthPool(&cfg, logger)
+	AuthPool(&cfg)
 	logger.Info("[Db]Initailized AuthPool")
-	MainPool(&cfg, logger)
+	MainPool(&cfg)
 	logger.Info("[Db]Initailized MainPool")
 }
