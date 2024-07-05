@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"sync"
 
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/logging"
@@ -24,7 +25,17 @@ type absConn[C Conn] struct {
 }
 
 func (c *absConn[C]) close() {
-	c.pool.returnConn()
+	c.pool.mu.Lock()
+	if c.pool.using > 0 {
+		c.pool.using -= 1
+	}
+	if len(c.pool.listener) != 0 {
+		sig := c.pool.listener[0]
+		c.pool.listener = c.pool.listener[1:]
+		sig <- true
+	} else {
+		c.pool.mu.Unlock()
+	}
 	c.pool = nil
 }
 
@@ -35,6 +46,8 @@ func (c *absConn[C]) Closed() bool {
 // connection pool
 
 type ConnPool[C Conn] struct {
+	mu       sync.Mutex
+	listener []chan bool
 	lg       logging.Logger
 	capacity int
 	using    int
@@ -44,21 +57,21 @@ type ConnPool[C Conn] struct {
 
 // should be async
 func (p *ConnPool[C]) Open() (c C, err error) {
+	p.mu.Lock()
 	if p.using >= p.capacity {
-		return c, ErrNoConn
+		sig := make(chan bool)
+		p.listener = append(p.listener, sig)
+		p.mu.Unlock()
+		<-sig
 	}
 	c, ok := p.newConn(p.client, p.lg, p)
 	if !ok {
+		p.mu.Unlock()
 		return c, ErrNoConn
 	}
 	p.using += 1
+	p.mu.Unlock()
 	return c, nil
-}
-
-func (p *ConnPool[C]) returnConn() {
-	if p.using > 0 {
-		p.using -= 1
-	}
 }
 
 // auth pool
