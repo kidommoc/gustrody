@@ -9,7 +9,8 @@ import (
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-func (service *PostService) Reply(username, postID, vsb, content string, attachments []AttachImg) error {
+// only used with local user
+func (service *PostService) Reply(username, postID, vsb, content string, date time.Time, attachments []AttachImg) error {
 	logger := service.lg
 	if !service.user.IsUserExist(username) {
 		return ErrUserNotFound
@@ -21,11 +22,11 @@ func (service *PostService) Reply(username, postID, vsb, content string, attachm
 		return ErrContentTooLong
 	}
 
-	id := service.newID()
+	id := utils.NewUUID()
 	for service.db.Query.IsPostExist(id) {
-		id = service.newID()
+		id = utils.NewUUID()
 	}
-	url := service.getUrl(id)
+	url := utils.GeneratePostID(id, service.site)
 
 	v, ok := utils.GetVsb(vsb)
 	if !ok {
@@ -46,8 +47,8 @@ func (service *PostService) Reply(username, postID, vsb, content string, attachm
 	}
 
 	p := models.Post{
-		ID: id, Url: url, User: username, Date: time.Now(),
-		Replying: postID, Vsb: v, Content: content,
+		ID: id, Url: url, User: models.NewUD(username),
+		Date: date, Replying: postID, Vsb: v, Content: content,
 	}
 	if e := service.db.Set.SetPost(&p, imgs); e != nil {
 		switch e {
@@ -66,6 +67,9 @@ func (service *PostService) Reply(username, postID, vsb, content string, attachm
 // set replyings and replies of a post
 func (service *PostService) setReplies(post *Post) error {
 	logger := service.lg
+
+	// !!may update foreign
+
 	rt, rs, e := service.db.Query.QueryPostReplies(post.ID)
 	if e != nil {
 		msg := fmt.Sprintf("[Posts.Reply] Cannot get replyings and replies of %s", post.ID)

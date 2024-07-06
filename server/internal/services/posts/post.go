@@ -18,7 +18,7 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 	logger := service.lg
 	var u *users.UserInfo
 	if len(us) == 0 {
-		uu, e := service.user.GetInfo(p.User)
+		uu, e := service.user.GetInfo(p.User.String())
 		if e != nil {
 			return post, ErrUserNotFound
 		}
@@ -31,7 +31,7 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 		ID:          p.ID,
 		Url:         p.Url,
 		User:        u,
-		Date:        p.Date.Format(time.RFC3339),
+		Date:        utils.DateString(p.Date),
 		Visibility:  p.Vsb.String(),
 		Content:     p.Content,
 		Likes:       p.Likes,
@@ -48,8 +48,9 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 			continue
 		}
 		img := AttachImg{
-			Url: v.Url,
-			Alt: v.Alt,
+			Type: v.Type,
+			Url:  v.Url,
+			Alt:  v.Alt,
 		}
 		ext := a[len(a)-1]
 		switch ext {
@@ -68,12 +69,13 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 	return post, nil
 }
 
-func (service *PostService) Get(user, postID string) (post Post, err error) {
+func (service *PostService) Get(user, postID string) (post *Post, err error) {
 	logger := service.lg
 	result, e := service.db.Query.QueryPostByID(postID)
 	if e != nil {
 		switch e {
 		case models.ErrNotFound:
+			// try foreign
 			return post, ErrPostNotFound
 		default:
 			msg := fmt.Sprintf("[Posts] ")
@@ -82,11 +84,11 @@ func (service *PostService) Get(user, postID string) (post Post, err error) {
 		}
 	}
 
-	if !service.checkPermission(user, result.User, result.ID, result.Vsb) {
+	if !service.checkPermission(user, &result) {
 		return post, ErrNotPermitted
 	}
 
-	post, e = service.makePost(&result)
+	p, e := service.makePost(&result)
 	if e != nil {
 		switch e {
 		case models.ErrNotFound:
@@ -97,9 +99,9 @@ func (service *PostService) Get(user, postID string) (post Post, err error) {
 			return post, ErrInternal
 		}
 	}
-	service.setReplies(&post)
+	service.setReplies(&p)
 
-	return post, nil
+	return &p, nil
 }
 
 func (service *PostService) GetByUser(username, target string) (list []*Post, err error) {
@@ -118,6 +120,9 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 	us := make(map[string]*users.UserInfo)
 	us[target] = &user
 
+	if utils.UdReg.MatchString(target) {
+		// may update foreign
+	}
 	posts, e := service.db.Query.QueryPostsAndSharesByUser(target, false) // descending by date
 	if e != nil {
 		logger.Error("[Posts] Error when GetByUser", e)
@@ -140,7 +145,7 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 		us[u] = &ui
 		return &ui
 	}
-	fo_only := service.checkPermission(username, target, "", utils.Vsb_FOLLOWER)
+	fo_only := service.checkPermission(username, &models.Post{User: models.NewUD(target), Vsb: utils.Vsb_FOLLOWER})
 	for _, v := range posts {
 		switch v.Vsb {
 		case utils.Vsb_FOLLOWER:
@@ -148,11 +153,11 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 				continue
 			}
 		case utils.Vsb_DIRECT:
-			if !service.checkPermission(username, target, v.ID, v.Vsb) {
+			if !service.checkPermission(username, v) {
 				continue
 			}
 		}
-		u := gu(v.User)
+		u := gu(v.User.String())
 		if u == nil {
 			continue
 		}
@@ -168,7 +173,8 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 	return list, nil
 }
 
-func (service *PostService) New(username, vsb, content string, attachments []AttachImg) error {
+// only used with local user
+func (service *PostService) New(username, vsb, content string, date time.Time, attachments []AttachImg) error {
 	logger := service.lg
 	if !service.user.IsUserExist(username) {
 		return ErrUserNotFound
@@ -180,11 +186,11 @@ func (service *PostService) New(username, vsb, content string, attachments []Att
 		return ErrContentTooLong
 	}
 
-	id := service.newID()
+	id := utils.NewUUID()
 	for service.db.Query.IsPostExist(id) {
-		id = service.newID()
+		id = utils.NewUUID()
 	}
-	url := service.getUrl(id)
+	url := utils.GeneratePostID(id, service.site)
 
 	imgs := []models.Img{}
 	for i, v := range attachments {
@@ -205,8 +211,8 @@ func (service *PostService) New(username, vsb, content string, attachments []Att
 	}
 
 	p := models.Post{
-		ID: id, Url: url, User: username, Date: time.Now(),
-		Replying: "", Vsb: v, Content: content,
+		ID: id, Url: url, User: models.NewUD(username),
+		Date: date, Replying: "", Vsb: v, Content: content,
 	}
 	if e := service.db.Set.SetPost(&p, imgs); e != nil {
 		logger.Error("[Post] Cannot set post", e)
@@ -236,7 +242,7 @@ func (service *PostService) Edit(username, postID, content string, attachments [
 			return ErrInternal
 		}
 	}
-	if post.User != username {
+	if post.User.String() != username {
 		return ErrOwner
 	}
 
@@ -278,7 +284,7 @@ func (service *PostService) Remove(username, postID string) error {
 			return ErrInternal
 		}
 	}
-	if post.User != username {
+	if post.User.String() != username {
 		return ErrOwner
 	}
 

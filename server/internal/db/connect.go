@@ -25,7 +25,7 @@ type absConn[C Conn] struct {
 }
 
 func (c *absConn[C]) close() {
-	c.pool.mu.Lock()
+	c.pool.mutex.Lock()
 	logger := logging.Get()
 	logger.Debug(fmt.Sprintf("closed, using: %d", c.pool.using))
 	if c.pool.using > 0 {
@@ -36,7 +36,7 @@ func (c *absConn[C]) close() {
 		c.pool.listener = c.pool.listener[1:]
 		sig <- true
 	} else {
-		c.pool.mu.Unlock()
+		c.pool.mutex.Unlock()
 	}
 	c.pool = nil
 }
@@ -52,7 +52,7 @@ type ConnPool[C Conn] interface {
 }
 
 type connPool[C Conn] struct {
-	mu       sync.Mutex
+	mutex    sync.Mutex
 	listener []chan bool
 	capacity int
 	using    int
@@ -62,20 +62,20 @@ type connPool[C Conn] struct {
 
 // should be async
 func (p *connPool[C]) Open() (conn C, err error) {
-	p.mu.Lock()
+	p.mutex.Lock()
 	if p.using >= p.capacity {
 		sig := make(chan bool)
 		p.listener = append(p.listener, sig)
-		p.mu.Unlock()
+		p.mutex.Unlock()
 		<-sig
 	}
 	c, ok := p.newConn(p.client, p)
 	if !ok {
-		p.mu.Unlock()
+		p.mutex.Unlock()
 		return c, ErrNoConn
 	}
 	p.using += 1
-	p.mu.Unlock()
+	p.mutex.Unlock()
 	return c, nil
 }
 

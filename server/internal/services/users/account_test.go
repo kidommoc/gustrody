@@ -25,8 +25,8 @@ var us = []struct {
 func TestAccountRegister(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 	udb := newUdb(t)
-	mAccDb := newMockingAccountDb(udb)
-	mAthDb := newMockingAuthDb()
+	mAccDb := &MockingAccountDb{udb}
+	mAthDb := &MockingAuthDb{}
 	dbs := UserDbs{
 		Account: mAccDb,
 		Auth:    mAthDb,
@@ -36,7 +36,7 @@ func TestAccountRegister(t *testing.T) {
 	err := service.Register(us[0].Username, us[0].Nickname, us[0].Password)
 	test.AssertNoError(t, err)
 
-	wantUser := models.User{Username: us[0].Username, Nickname: us[0].Nickname}
+	wantUser := models.User{Username: models.NewUD(us[0].Username), Nickname: us[0].Nickname}
 	gotUser := udb.data[us[0].Username]
 	t.Logf("\nPublic key:\n%s\nPrivate key:\n%s",
 		gotUser.Keys.Pub, gotUser.Keys.Pri,
@@ -52,8 +52,8 @@ func TestAccountRegister(t *testing.T) {
 func TestAccountUpdatePassword(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 	udb := newUdb(t)
-	mInfDb := newMockingInfoDb(udb)
-	mAthDb := newMockingAuthDb()
+	mInfDb := &MockingInfoDb{udb}
+	mAthDb := &MockingAuthDb{}
 	dbs := UserDbs{
 		Info: mInfDb,
 		Auth: mAthDb,
@@ -93,7 +93,7 @@ func TestAccountPreferences(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 
 	udb := newUdb(t)
-	mAccDb := newMockingAccountDb(udb)
+	mAccDb := &MockingAccountDb{udb}
 	dbs := UserDbs{
 		Account: mAccDb,
 	}

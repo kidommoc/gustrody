@@ -9,19 +9,27 @@ import (
 
 func (service *PostService) GetLikes(user, postID string) (list []*users.UserInfo, err error) {
 	logger := service.lg
-	result, owner, vsb, e := service.db.Like.QueryLikes(postID)
-	if e != nil && e != models.ErrNotFound {
-		msg := fmt.Sprintf("[Posts.Like] Cannot get likes of %s", postID)
-		logger.Error(msg, e)
-		return nil, ErrInternal
-	}
 
-	if !service.checkPermission(user, owner, postID, vsb) {
+	post, err := service.db.Query.QueryPostByID(postID)
+	if err != nil {
+		switch err {
+		case models.ErrNotFound:
+			return nil, ErrPostNotFound
+		default:
+			msg := fmt.Sprintf("[Posts.Share] Cannot query %s", postID)
+			logger.Error(msg, err)
+			return nil, ErrInternal
+		}
+	}
+	if !service.checkPermission(user, &post) {
 		return nil, ErrNotPermitted
 	}
 
-	if e != nil {
-		return list, ErrPostNotFound
+	result, err := service.db.Like.QueryLikes(postID)
+	if err != nil && err != models.ErrNotFound {
+		msg := fmt.Sprintf("[Posts.Like] Cannot get likes of %s", postID)
+		logger.Error(msg, err)
+		return nil, ErrInternal
 	}
 
 	us := make(map[string]*users.UserInfo)
@@ -43,7 +51,7 @@ func (service *PostService) GetLikes(user, postID string) (list []*users.UserInf
 	}
 	list = make([]*users.UserInfo, 0, len(result))
 	for _, u := range result {
-		info := gu(u)
+		info := gu(u.String())
 		if info != nil {
 			list = append(list, info)
 		}
@@ -54,7 +62,7 @@ func (service *PostService) GetLikes(user, postID string) (list []*users.UserInf
 
 func (service *PostService) Like(username, postID string) error {
 	logger := service.lg
-	if err := service.db.Like.SetLike(username, postID); err != nil {
+	if err := service.db.Like.SetLike(models.NewUD(username), postID); err != nil {
 		switch {
 		case err == models.ErrNotFound:
 			return ErrPostNotFound
@@ -69,7 +77,7 @@ func (service *PostService) Like(username, postID string) error {
 
 func (service *PostService) Unlike(username, postID string) error {
 	logger := service.lg
-	if err := service.db.Like.RemoveLike(username, postID); err != nil {
+	if err := service.db.Like.RemoveLike(models.NewUD(username), postID); err != nil {
 		switch err {
 		case models.ErrNotFound:
 			switch err.Error() {

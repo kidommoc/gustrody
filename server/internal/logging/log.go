@@ -106,7 +106,7 @@ type Logger interface {
 }
 
 type logger struct {
-	mutex       *sync.Mutex
+	mutex       sync.Mutex
 	path        string
 	date        string
 	level       logLevel
@@ -175,7 +175,6 @@ func Get(c ...config.Config) Logger {
 		cfg = c[0]
 	}
 	l := logger{
-		mutex: &sync.Mutex{},
 		path:  cfg.Logfile,
 		level: levels[cfg.LogLevel],
 		split: splits[cfg.LogSplit],

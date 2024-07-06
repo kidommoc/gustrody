@@ -14,8 +14,14 @@ func (service *UserService) Follow(actor, target string) error {
 	if !service.db.Info.IsUserExist(target) {
 		return ErrFollowToNotFound
 	}
+
 	logger := service.lg
-	if err := service.db.Follow.SetFollow(actor, target); err != nil {
+	act := models.NewUD(actor)
+	tgt := models.NewUD(target)
+	if act.Username == "" || tgt.Username == "" {
+		// error
+	}
+	if err := service.db.Follow.SetFollow(act, tgt); err != nil {
 		switch err {
 		case models.ErrDunplicate:
 			return nil
@@ -37,8 +43,14 @@ func (service *UserService) Unfollow(actor, target string) error {
 	if !service.db.Info.IsUserExist(target) {
 		return ErrFollowToNotFound
 	}
+
 	logger := service.lg
-	if err := service.db.Follow.RemoveFollow(actor, target); err != nil {
+	act := models.NewUD(actor)
+	tgt := models.NewUD(target)
+	if act.Username == "" || tgt.Username == "" {
+		// error
+	}
+	if err := service.db.Follow.RemoveFollow(act, tgt); err != nil {
 		switch err {
 		case models.ErrNotFound:
 			return nil

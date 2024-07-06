@@ -2,6 +2,7 @@ package users
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/utils"
@@ -12,12 +13,17 @@ type Preferences struct {
 	ShareVsb utils.Vsb `json:"shareVsb"`
 }
 
+var usernameReg = regexp.MustCompile("[A-z]{1}[A-z0-9]{5,}")
+
 // DB: Account, Auth
 func (service *UserService) Register(username, nickname, password string) error {
 	logger := service.lg
 
+	if !usernameReg.MatchString(username) {
+		return ErrSyntax
+	}
 	account := models.User{
-		Username: username,
+		Username: models.NewUD(username),
 		Nickname: nickname,
 		Keys:     models.KeyPair{},
 	}
@@ -73,8 +79,8 @@ type ProfileBody struct {
 	Nickname *string `json:"nickname,omitempty"`
 	Summary  *string `json:"summary,omitempty"`
 	Avatar   *struct {
-		Type *string `json:"type,omitempty"`
-		Url  *string `json:"url,omitempty"`
+		Type string `json:"type"`
+		Url  string `json:"url"`
 	} `json:"avatar,omitempty"`
 }
 
@@ -102,10 +108,15 @@ func (service *UserService) UpdateProfile(username string, body *ProfileBody) er
 	}
 	if body.Avatar != nil {
 		// check type
+		t := body.Avatar.Type
 		// check url
+		url := body.Avatar.Url
 
-		if body.Avatar.Url != nil {
-			pf.Avatar = *body.Avatar.Url
+		if t != "" && url != "" {
+			pf.Avatar = models.Img{
+				Type: t,
+				Url:  url,
+			}
 		}
 	}
 
@@ -118,6 +129,7 @@ func (service *UserService) UpdateProfile(username string, body *ProfileBody) er
 	return nil
 }
 
+// DB: Account
 func (service *UserService) GetPreferences(username string) (pf Preferences, err error) {
 	logger := service.lg
 	mpf, err := service.db.Account.QueryUserPreferences(username)
@@ -141,6 +153,7 @@ type PreferenceBody struct {
 	ShareVsb *string `json:"shareVsb,omitempty"`
 }
 
+// DB: Account
 func (service *UserService) UpdatePreferences(username string, body *PreferenceBody) error {
 	logger := service.lg
 

@@ -1,26 +1,12 @@
 package posts
 
 import (
-	"github.com/google/uuid"
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/services/users"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
-
-type AttachImg struct {
-	Type string `json:"type"`
-	Url  string `json:"url"`
-	Alt  string `json:"alt"`
-}
-
-func ToModelImg(i AttachImg) models.Img {
-	return models.Img{
-		Url: i.Url,
-		Alt: i.Alt,
-	}
-}
 
 type Post struct {
 	ID          string          `json:"id"`
@@ -36,6 +22,20 @@ type Post struct {
 	Attachments []AttachImg     `json:"attachments,omitempty"`
 	Replyings   []*Post         `json:"replyings,omitempty"`
 	Replies     []*Post         `json:"replies,omitempty"`
+}
+
+type AttachImg struct {
+	Type string `json:"type"`
+	Url  string `json:"url"`
+	Alt  string `json:"alt"`
+}
+
+func ToModelImg(i AttachImg) models.Img {
+	return models.Img{
+		Type: i.Type,
+		Url:  i.Url,
+		Alt:  i.Alt,
+	}
 }
 
 // services
@@ -67,17 +67,10 @@ func NewService(us *users.UserService, dbs PostDbs, cfg config.Config, lg loggin
 	}
 }
 
-func (service *PostService) newID() string {
-	return uuid.New().String()
-}
-
-func (service *PostService) getUrl(id string) string {
-	return service.site + "/posts/" + id
-}
-
-func (service *PostService) checkPermission(user, target, postID string, vsb utils.Vsb) bool {
-	switch vsb {
+func (service *PostService) checkPermission(user string, post *models.Post) bool {
+	switch post.Vsb {
 	case utils.Vsb_FOLLOWER:
+		target := post.User.String()
 		if user == "" || (user != target && !service.user.IsFollowing(user, target)) {
 			return false
 		}

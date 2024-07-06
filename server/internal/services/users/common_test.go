@@ -1,7 +1,6 @@
 package users
 
 import (
-	"crypto/rsa"
 	"testing"
 
 	"github.com/kidommoc/gustrody/internal/models"
@@ -22,18 +21,14 @@ type MockingAccountDb struct {
 	data *uDb
 }
 
-func newMockingAccountDb(u *uDb) *MockingAccountDb {
-	return &MockingAccountDb{u}
-}
-
 func (db *MockingAccountDb) SetUser(user *models.User) error {
-	db.data.data[user.Username] = user
+	db.data.data[user.Username.String()] = user
 	return nil
 }
 
 // will never use
-func (db *MockingAccountDb) QueryUserKeys(username string) (pub *rsa.PublicKey, pri *rsa.PrivateKey, err error) {
-	return nil, nil, nil
+func (db *MockingAccountDb) QueryUserKeys(username string) (pub string, pri string, err error) {
+	return "", "", nil
 }
 
 func (db *MockingAccountDb) QueryUserPreferences(username string) (pf *models.Preferences, err error) {
@@ -57,10 +52,6 @@ func (db *MockingAccountDb) UpdateUserPreferences(username string, pf *models.Pr
 
 type MockingInfoDb struct {
 	data *uDb
-}
-
-func newMockingInfoDb(u *uDb) *MockingInfoDb {
-	return &MockingInfoDb{u}
 }
 
 // for simplicity, always true

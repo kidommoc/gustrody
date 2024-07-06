@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 )
@@ -21,16 +22,7 @@ func NewKeyPair() (pub string, pri string) {
 	priKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	pubKey := &priKey.PublicKey
 
-	b, err := x509.MarshalPKIXPublicKey(pubKey)
-	if err != nil {
-		// handle error
-		fmt.Println(err)
-	}
-	pubBlock := &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: b,
-	}
-	pub = string(pem.EncodeToMemory(pubBlock))
+	pub = GetPublicKeyPem(pubKey)
 
 	priBlock := &pem.Block{
 		Type:  "RSA PRIVATE KEY",
@@ -63,6 +55,19 @@ func GetPublicKey(s string) *rsa.PublicKey {
 	return nil
 }
 
+func GetPublicKeyPem(key *rsa.PublicKey) string {
+	b, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		// handle error
+		fmt.Println(err)
+	}
+	pubBlock := &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: b,
+	}
+	return string(pem.EncodeToMemory(pubBlock))
+}
+
 func GetPrivateKey(s string) *rsa.PrivateKey {
 	b, _ := pem.Decode([]byte(s))
 	if b.Type != "RSA PRIVATE KEY" {
@@ -83,16 +88,22 @@ func Sign(pri *rsa.PrivateKey, msg string) string {
 	hashed := SHA256Hash(msg)
 	signed, err := rsa.SignPKCS1v15(nil, pri, crypto.SHA256, hashed)
 	if err != nil {
-		// handle error
 		fmt.Println(err)
 		return ""
 	}
-	return string(signed)
+	encoded := base64.StdEncoding.EncodeToString(signed)
+
+	return string(encoded)
 }
 
 func Verify(pub *rsa.PublicKey, signed, compare string) bool {
 	hashed := SHA256Hash(compare)
-	err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, hashed, []byte(signed))
+	decoded, err := base64.StdEncoding.DecodeString(signed)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	err = rsa.VerifyPKCS1v15(pub, crypto.SHA256, hashed, []byte(decoded))
 	if err == nil {
 		return true
 	} else {

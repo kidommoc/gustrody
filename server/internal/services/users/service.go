@@ -45,7 +45,3 @@ func NewService(dbs UserDbs, cfg config.Config, lg logging.Logger) *UserService 
 		db:   dbs,
 	}
 }
-
-func (service *UserService) generateID(username string) string {
-	return service.site + "/users/" + username
-}
