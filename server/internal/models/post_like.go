@@ -20,7 +20,7 @@ func (db *PostDb) QueryLikes(id string) (list []UD, err error) {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.PostLike] Failed to open a connection", err)
 		return nil, ErrDbInternal
 	}
 	defer conn.Close()
@@ -36,7 +36,7 @@ func (db *PostDb) QueryLikes(id string) (list []UD, err error) {
 		case sql.ErrNoRows:
 			return nil, ErrNotFound
 		default:
-			logger.Error("[Model.Like] Cannot scan row", e)
+			logger.Error("[Model.PostLike] Cannot scan row", e)
 			return nil, ErrDbInternal
 		}
 	}
@@ -52,7 +52,7 @@ func (db *PostDb) SetLike(user UD, id string) error {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model.Like] Failed to open a connection", err)
+		logger.Error("[Model.PostLike] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()
@@ -67,7 +67,7 @@ func (db *PostDb) SetLike(user UD, id string) error {
   			  AND ARRAY_POSITION("likes", $1) IS NULL;`
 	r, e := conn.Exec(qs, user, id)
 	if e != nil {
-		logger.Error("[Model.Reply] Failed to execute", e)
+		logger.Error("[Model.PostLike] Failed to execute", e)
 		return ErrDbInternal
 	}
 	if r == 0 {
@@ -84,7 +84,7 @@ func (db *PostDb) RemoveLike(user UD, id string) error {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model.Like] Failed to open a connection", err)
+		logger.Error("[Model.PostLike] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()
@@ -94,7 +94,7 @@ func (db *PostDb) RemoveLike(user UD, id string) error {
 			WHERE "id" = $2;`
 	r, e := conn.Exec(qs, user, id)
 	if e != nil {
-		logger.Error("[Model.Reply] Failed to execute", e)
+		logger.Error("[Model.PostLike] Failed to execute", e)
 		return ErrDbInternal
 	}
 	if r == 0 {

@@ -36,7 +36,7 @@ var uatTablePf = []Preferences{
 	},
 }
 
-func TestUserSet(t *testing.T) {
+func TestUserSetAndQuery(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 	mp := newMockingPqPool(postcfg, logger)
 	userDb := &UserDb{logger, mp}
@@ -49,18 +49,22 @@ func TestUserSet(t *testing.T) {
 	})
 
 	input := uatTableU[0]
-	input.Date = time.Now()
-	input.Keys.Pub, input.Keys.Pri = utils.NewKeyPair()
-	err := userDb.SetUser(&input)
-	test.AssertNoError(t, err, "Error when set: %+v")
+	t.Run("Set", func(t *testing.T) {
+		input.Date = time.Now()
+		input.Keys.Pub, input.Keys.Pri = utils.NewKeyPair()
+		err := userDb.SetUser(&input)
+		test.AssertNoError(t, err, "Error when set: %+v")
+	})
 
-	got, err := userDb.QueryUser(input.Username.Username)
-	test.AssertNoError(t, err, "Error when query: %+v")
+	t.Run("Query", func(t *testing.T) {
+		got, err := userDb.QueryUser(input.Username.Username)
+		test.AssertNoError(t, err, "Error when query: %+v")
 
-	t.Logf("\ninput: %+v\ngot: %+v\n", input, got)
+		t.Logf("\ninput: %+v\ngot: %+v\n", input, got)
 
-	_, _, err = userDb.QueryUserKeys(input.Username.Username)
-	test.AssertNoError(t, err, "Error when query keys: %+v")
+		_, _, err = userDb.QueryUserKeys(input.Username.Username)
+		test.AssertNoError(t, err, "Error when query keys: %+v")
+	})
 }
 
 func TestUserUpdate(t *testing.T) {
@@ -75,18 +79,21 @@ func TestUserUpdate(t *testing.T) {
 		}
 	})
 
-	input := uatTableU[0]
-	err := userDb.SetUser(&input)
-	test.AssertNoError(t, err, "Error when set: %+v")
+	t.Run("Set", func(t *testing.T) {
+		input := uatTableU[0]
+		err := userDb.SetUser(&input)
+		test.AssertNoError(t, err, "Error when set: %+v")
+	})
 
-	input = uatTableU[1]
-	err = userDb.UpdateUser(&input)
-	test.AssertNoError(t, err, "Error when update: %+v")
+	t.Run("Update", func(t *testing.T) {
+		input := uatTableU[1]
+		err := userDb.UpdateUser(&input)
+		test.AssertNoError(t, err, "Error when update: %+v")
 
-	got, err := userDb.QueryUser(input.Username.Username)
-	test.AssertNoError(t, err, "Error when query: %+v")
-
-	t.Logf("\ninput: %+v\ngot: %+v\n", input, got)
+		got, err := userDb.QueryUser(input.Username.Username)
+		test.AssertNoError(t, err, "Error when query: %+v")
+		t.Logf("\ninput: %+v\ngot: %+v\n", input, got)
+	})
 }
 
 func TestPreferenceUpdate(t *testing.T) {
@@ -102,18 +109,23 @@ func TestPreferenceUpdate(t *testing.T) {
 	})
 
 	inputU := uatTableU[0]
-	err := userDb.SetUser(&inputU)
-	test.AssertNoError(t, err, "Error when set user: %+v")
-
-	before, err := userDb.QueryUserPreferences(inputU.Username.Username)
-	test.AssertNoError(t, err, "Error when query before: %+v")
-
 	input := uatTablePf[1]
-	err = userDb.UpdateUserPreferences(inputU.Username.Username, &input)
-	test.AssertNoError(t, err, "Error when update: %+v")
+	var before *Preferences
+	t.Run("Set", func(t *testing.T) {
+		err := userDb.SetUser(&inputU)
+		test.AssertNoError(t, err, "Error when set user: %+v")
+		before, err = userDb.QueryUserPreferences(inputU.Username.Username)
+		test.AssertNoError(t, err, "Error when query before: %+v")
+	})
 
-	after, err := userDb.QueryUserPreferences(inputU.Username.Username)
-	test.AssertNoError(t, err, "Error when query after: %+v")
+	t.Run("Update", func(t *testing.T) {
+		err := userDb.UpdateUserPreferences(inputU.Username.Username, &input)
+		test.AssertNoError(t, err, "Error when update: %+v")
+	})
 
-	t.Logf("\ninput: %+v\nbefore: %+v\nafter: %+v", input, before, after)
+	t.Run("Query", func(t *testing.T) {
+		after, err := userDb.QueryUserPreferences(inputU.Username.Username)
+		test.AssertNoError(t, err, "Error when query after: %+v")
+		t.Logf("\ninput: %+v\nbefore: %+v\nafter: %+v", input, before, after)
+	})
 }

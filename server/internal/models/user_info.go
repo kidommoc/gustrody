@@ -18,19 +18,16 @@ func (db *UserDb) IsUserExist(username string) bool {
 	}
 	defer conn.Close()
 
-	qs := ` SELECT 1
-			FROM users
-			WHERE "username" = $1;`
+	qs := `SELECT 1 FROM users WHERE "username" = $1;`
 	r := conn.QueryOne(qs, username)
 	var n int
-	if e := r.Scan(&n); e != nil { // can't understand why i MUST scan to check whether result is empty. silly design
-		switch e {
+	if err := r.Scan(&n); err != nil { // can't understand why i MUST scan to check whether result is empty. silly design
+		switch err {
 		case sql.ErrNoRows:
-			return false
 		default:
-			logger.Error("[Model.UserInfo] Cannot query", e)
-			return false
+			logger.Error("[Model.UserInfo] Cannot query", err)
 		}
+		return false
 	}
 	return true
 }
@@ -48,8 +45,7 @@ func (db *UserDb) QueryUser(username string) (user User, err error) {
 	}
 	defer conn.Close()
 
-	qs := ` SELECT
-			  "username", "nickname", "summary", "createdAt"
+	qs := ` SELECT "username", "nickname", "summary", "createdAt"
 			FROM users
 			WHERE "username" = $1;`
 	r := conn.QueryOne(qs, username)
@@ -85,14 +81,14 @@ func (db *UserDb) UpdateUser(user *User) error {
 	defer conn.Close()
 
 	qs := ` UPDATE users
-			SET
-			  "nickname" = $2, "summary" = $3, "avatar" = $4
+			SET "nickname" = $2, "summary" = $3, "avatar" = $4
 			WHERE "username" = $1;`
 	r, err := conn.Exec(qs, user.Username.Username,
 		user.Nickname, user.Summary, user.Avatar,
 	)
 	if err != nil {
 		logger.Error("[Model.UserInfo] Failed to execute", err)
+		return ErrDbInternal
 	}
 	if r == 0 {
 		return ErrNotFound

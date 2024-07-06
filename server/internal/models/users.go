@@ -25,14 +25,6 @@ type User struct {
 	Preferences Preferences `json:"preferences"`
 }
 
-type ForeignUser struct {
-	User        UD     `json:"user"`
-	ID          string `json:"id"`
-	PubKey      string `json:"pub"`
-	Inbox       string `json:"inbox"`
-	SharedInbox string `json:"sharedInbox"`
-}
-
 type UD struct {
 	Username string
 	Domain   string

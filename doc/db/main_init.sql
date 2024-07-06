@@ -36,14 +36,12 @@ CREATE TABLE IF NOT EXISTS users (
   "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
 );
 
-CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
-CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
-
 CREATE TABLE IF NOT EXISTS foreign_users (
   "user" text PRIMARY KEY,
-  "id" text,
+  "id" text NOT NULL,
+  "avatar" text,
+  "avatarUrl" text,
   "inbox" text NOT NULL,
-  "sharedInbox" text NOT NULL,
   "pub" text NOT NULL
 );
 

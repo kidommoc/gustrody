@@ -71,10 +71,7 @@ func (db *PostDb) SetShare(user UD, id string, date time.Time, vsb utils.Vsb) er
 	// update posts.shares
 	qs := ` UPDATE posts
 			SET "shares" = ARRAY_APPEND("shares", $1)
-			WHERE
-			  "id" = $2
-			  AND ARRAY_POSITION("shares", $1) IS NULL;
-	`
+			WHERE "id" = $2 AND ARRAY_POSITION("shares", $1) IS NULL;`
 	r, e := tx.Exec(qs, user, id)
 	if e != nil {
 		logger.Error("[Model.Share] Failed to execute", e)
@@ -130,8 +127,7 @@ func (db *PostDb) RemoveShare(user UD, id string) error {
 	err1 := func() error {
 		qs := ` UPDATE posts
 				SET "shares" = ARRAY_REMOVE("shares", $1)
-				WHERE "id" = $2;
-		`
+				WHERE "id" = $2;`
 		r, e := tx.Exec(qs, user, id)
 		if e != nil {
 			logger.Error("[Model.Share] Failed to exec", e)

@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS users (
   "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
 );
 
-CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
-CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
+-- CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
+-- CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
 ```
 
 ### Queries
@@ -118,9 +118,10 @@ WHERE "username" = ${username};
 ```sql
 CREATE TABLE IF NOT EXISTS foreign_users (
   "user" text PRIMARY KEY,
-  "id" text,
+  "id" text NOT NULL,
+  "avatar" text,
+  "avatarUrl" text,
   "inbox" text NOT NULL,
-  "sharedInbox" text NOT NULL,
   "pub" text NOT NULL
 );
 ```
@@ -133,28 +134,29 @@ CREATE TABLE IF NOT EXISTS foreign_users (
 
 ```sql
 INSERT INTO foreign_users(
-  "user", "id", "pub", "inbox", "sharedInbox"
+  "user", "id", "avatar", "avatarUrl", "pub", "inbox"
 )
 VALUES (
-  ${username@domain}, ${userID}, ${public_key}
-  ${inbox_url}, ${shared_inbox_url}
+  ${username@domain}, ${userID},
+  ${avatarUrl}, ${avatarRemoteUrl},
+  ${public_key}, ${inbox_url}
 );
 ```
 
 - query a foreign user
 
 ```sql
-SELECT "id", "pub", "inbox", "sharedInbox"
+SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
 FROM foreign_users
-WHERE "user" = ${username};
+WHERE "user" = ${username@domain};
 ```
 
 - query all shared inboxes of a group of users
 
 ```sql
-SELECT DISTINCT "sharedInbox"
+SELECT DISTINCT "inbox"
 FROM foreign_users
-WHERE "user" IN ARRAY(${user_in_group}, ...);
+WHERE "user" IN ARRAY(${username@domain}, ...);
 ```
 
 ## TABLE: follow

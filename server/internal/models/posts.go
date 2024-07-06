@@ -22,9 +22,9 @@ type Img struct {
 // implement database/sql/driver.Valuer
 func (img Img) Value() (driver.Value, error) {
 	if img.Alt == "" {
-		return fmt.Sprintf(`"(%s,%s,)"`, img.Type, img.Url), nil
+		return fmt.Sprintf(`(%s,%s,)`, img.Type, img.Url), nil
 	} else {
-		return fmt.Sprintf(`"(%s,%s,%s)"`, img.Type, img.Url, img.Alt), nil
+		return fmt.Sprintf(`(%s,%s,%s)`, img.Type, img.Url, img.Alt), nil
 	}
 }
 

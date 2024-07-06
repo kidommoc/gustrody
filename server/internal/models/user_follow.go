@@ -92,8 +92,7 @@ func (db *UserDb) QueryUserFollowings(username string) (list []string, err error
 
 	qs := ` SELECT "to" AS "following"
 			FROM follow
-			WHERE "from" = $1;
-	`
+			WHERE "from" = $1;`
 	r, e := conn.Query(qs, username)
 	if e != nil {
 		logger.Error("[Model.UserFollow] Failed to query", e)

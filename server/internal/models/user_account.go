@@ -17,19 +17,13 @@ func (db *UserDb) SetUser(user *User) error {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.UserAccount] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()
 
-	qs := ` INSERT INTO users(
-				"username", "nickname", "summary",
-				"createdAt", "avatar", "keys"
-			)
-			VALUES (
-				$1, $2, '',
-				$3, '', $4
-			);`
+	qs := ` INSERT INTO users("username", "nickname", "summary", "createdAt", "avatar", "keys")
+			VALUES ($1, $2, '', $3, '', $4);`
 	r, err := conn.Exec(qs,
 		user.Username, user.Nickname,
 		time.Now().UTC(), user.Keys,
@@ -48,7 +42,7 @@ func (db *UserDb) QueryUserKeys(username string) (pub string, pri string, err er
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.UserAccount] Failed to open a connection", err)
 		return "", "", ErrDbInternal
 	}
 	defer conn.Close()
@@ -69,7 +63,7 @@ func (db *UserDb) QueryUserPreferences(username string) (pf *Preferences, err er
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.UserAccount] Failed to open a connection", err)
 		return nil, ErrDbInternal
 	}
 	defer conn.Close()
@@ -94,7 +88,7 @@ func (db *UserDb) UpdateUserPreferences(username string, pf *Preferences) error 
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.UserAccount] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()

@@ -67,17 +67,20 @@ func TestPostSetAndQuery(t *testing.T) {
 		}
 	})
 
-	input := pqstTable[0].input
-	want := pqstTable[0].want
-	want.Date = d
-	err := postDb.SetPost(&input.Post, input.Imgs)
-	test.AssertNoError(t, err, "Error when set: %+v")
+	t.Run("Set", func(t *testing.T) {
+		input := pqstTable[0].input
+		want := pqstTable[0].want
+		want.Date = d
+		err := postDb.SetPost(&input.Post, input.Imgs)
+		test.AssertNoError(t, err, "Error when set: %+v")
+	})
 
-	got, err := postDb.QueryPostByID("123")
-	test.AssertNoError(t, err, "Error when query: %+v")
-
-	t.Logf("got: %+v", got)
-	t.Logf("want: %+v", pqstTable[0].want)
+	t.Run("Query", func(t *testing.T) {
+		got, err := postDb.QueryPostByID("123")
+		test.AssertNoError(t, err, "Error when query: %+v")
+		t.Logf("got: %+v", got)
+		t.Logf("want: %+v", pqstTable[0].want)
+	})
 }
 
 func TestPostUpdate(t *testing.T) {
@@ -95,21 +98,25 @@ func TestPostUpdate(t *testing.T) {
 		}
 	})
 
-	input := pqstTable[0].input
-	err := postDb.SetPost(&input.Post, input.Imgs)
-	test.AssertNoError(t, err, "Error when set: %+v")
+	t.Run("Set", func(t *testing.T) {
+		input := pqstTable[0].input
+		err := postDb.SetPost(&input.Post, input.Imgs)
+		test.AssertNoError(t, err, "Error when set: %+v")
+	})
 
-	input = pqstTable[1].input
-	want := pqstTable[1].want
-	want.Date = d1
-	err = postDb.UpdatePost(&input.Post, input.Imgs)
-	test.AssertNoError(t, err, "Error when update: %+v")
+	t.Run("Update", func(t *testing.T) {
+		input := pqstTable[1].input
+		want := pqstTable[1].want
+		want.Date = d1
+		err := postDb.UpdatePost(&input.Post, input.Imgs)
+		test.AssertNoError(t, err, "Error when update: %+v")
 
-	got, err := postDb.QueryPostByID("123")
-	test.AssertNoError(t, err, "Error when query: %+v")
+		got, err := postDb.QueryPostByID("123")
+		test.AssertNoError(t, err, "Error when query: %+v")
 
-	t.Logf("got: %+v", got)
-	t.Logf("want: %+v", want)
+		t.Logf("got: %+v", got)
+		t.Logf("want: %+v", want)
+	})
 }
 
 func TestPostRemove(t *testing.T) {
@@ -126,20 +133,19 @@ func TestPostRemove(t *testing.T) {
 		}
 	})
 
-	input := pqstTable[0].input
-	want := pqstTable[0].want
-	want.Date = d
-	err := postDb.SetPost(&input.Post, input.Imgs)
-	test.AssertNoError(t, err, "Error when set: %+v")
+	t.Run("Set", func(t *testing.T) {
+		input := pqstTable[0].input
+		want := pqstTable[0].want
+		want.Date = d
+		err := postDb.SetPost(&input.Post, input.Imgs)
+		test.AssertNoError(t, err, "Error when set: %+v")
+		test.AssertEqual(t, true, postDb.IsPostExist(input.ID))
+	})
 
-	if !postDb.IsPostExist(input.ID) {
-		t.Errorf("Wrong result of IsPostExist: false")
-	}
-
-	err = postDb.RemovePost(input.ID)
-	test.AssertNoError(t, err, "Error when remove: %+v")
-
-	if postDb.IsPostExist(input.ID) {
-		t.Errorf("Wrong result of IsPostExist: true")
-	}
+	t.Run("Remove", func(t *testing.T) {
+		input := pqstTable[0].input
+		err := postDb.RemovePost(input.ID)
+		test.AssertNoError(t, err, "Error when remove: %+v")
+		test.AssertEqual(t, false, postDb.IsPostExist(input.ID))
+	})
 }

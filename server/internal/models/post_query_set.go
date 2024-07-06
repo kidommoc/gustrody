@@ -29,19 +29,16 @@ func (db *PostDb) IsPostExist(id string) bool {
 	}
 	defer conn.Close()
 
-	qs := `SELECT 1
-		   FROM posts
-		   WHERE "id" = $1;`
+	qs := `SELECT 1 FROM posts WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
 	var n int
-	if e := r.Scan(&n); e != nil {
-		switch e {
+	if err := r.Scan(&n); err != nil {
+		switch err {
 		case sql.ErrNoRows:
-			return false
 		default:
-			logger.Error("[Model.Posts] Cannot query", e)
-			return false
+			logger.Error("[Model.Posts] Cannot query", err)
 		}
+		return false
 	}
 	return true
 }
@@ -60,10 +57,8 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
 	defer conn.Close()
 
 	qs := ` SELECT
-			  "id", "url", "user", "date",
-			  "vsb", "content", "media",
-			  CARDINALITY("likes") as "likes",
-			  CARDINALITY("shares") as "shares"
+			  "id", "url", "user", "date", "vsb", "content", "media",
+			  CARDINALITY("likes") as "likes", CARDINALITY("shares") as "shares"
 			FROM posts
 			WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
@@ -72,7 +67,7 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
 	var vsb string
 	if e := r.Scan(
 		&post.ID, &post.Url, &post.User, &post.Date,
-		&vsb, &post.Content, post.Media.ToPqArray(),
+		&vsb, &post.Content, post.Media.ScanArray(),
 		&post.Likes, &post.Shares,
 	); e != nil {
 		switch e {
@@ -95,7 +90,7 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model.Reply] Failed to open a connection", err)
+		logger.Error("[Model.Posts] Failed to open a connection", err)
 		return nil, nil, ErrDbInternal
 	}
 	defer conn.Close()
@@ -108,22 +103,18 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 			    WHERE "id" = $1
 			  UNION ALL
 			    SELECT posts."id", posts."replying", rt."level" + 1
-			    FROM posts
-			      JOIN rt ON posts."id" = rt."replying"
+			    FROM posts JOIN rt ON posts."id" = rt."replying"
 			)
 			SELECT
   			  posts."id", posts."url", posts."user", posts."date",
   			  posts."vsb", posts."content", posts."media",
-			  CARDINALITY(posts."likes") as "likes",
-			  CARDINALITY(posts."shares") as "shares",
+			  CARDINALITY(posts."likes") as "likes", CARDINALITY(posts."shares") as "shares",
 			  posts."replying", rt."level"
-			FROM posts
-			  JOIN rt ON posts."id" = rt."id"
-			ORDER BY "level" ASC, "date" DESC;
-	`
+			FROM posts JOIN rt ON posts."id" = rt."id"
+			ORDER BY "level" ASC, "date" DESC;`
 	r, e := conn.Query(qs, id)
 	if e != nil {
-		logger.Error("[Model.Reply] Cannot query", e)
+		logger.Error("[Model.Posts] Cannot query", e)
 		return nil, nil, ErrDbInternal
 	}
 
@@ -134,11 +125,11 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, p.Media.ToPqArray(),
+			&vsb, &p.Content, p.Media.ScanArray(),
 			&p.Likes, &p.Shares,
 			&rpy, &p.Level,
 		); e != nil {
-			logger.Error("[Model.Reply] Cannot scan row", e)
+			logger.Error("[Model.Posts] Cannot scan row", e)
 			continue
 		}
 		if rpy.Valid {
@@ -153,22 +144,18 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 			    WHERE "id" = $1
 			  UNION ALL
 			    SELECT posts."id", posts."replying", rs."level" + 1
-			    FROM posts
-			      JOIN rs ON rs."id" = posts."replying"
+			    FROM posts JOIN rs ON rs."id" = posts."replying"
 			)
 			SELECT
   			  posts."id", posts."url", posts."user", posts."date",
   			  posts."vsb", posts."content", posts."media",
-			  CARDINALITY(posts."likes") as "likes",
-			  CARDINALITY(posts."shares") as "shares",
+			  CARDINALITY(posts."likes") as "likes", CARDINALITY(posts."shares") as "shares",
 			  posts."replying", rs."level"
-			FROM posts
-			  JOIN rs ON posts."id" = rs."id"
-			ORDER BY "level" ASC, "date" DESC;
-	`
+			FROM posts JOIN rs ON posts."id" = rs."id"
+			ORDER BY "level" ASC, "date" DESC;`
 	r, e = conn.Query(qs, id)
 	if e != nil {
-		logger.Error("[Model.Reply] Cannot query", e)
+		logger.Error("[Model.Posts] Cannot query", e)
 		return nil, nil, ErrDbInternal
 	}
 	replies = make([]*Post, 0)
@@ -178,11 +165,11 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, p.Media.ToPqArray(),
+			&vsb, &p.Content, p.Media.ScanArray(),
 			&p.Likes, &p.Shares,
 			&rpy, &p.Level,
 		); e != nil {
-			logger.Error("[Model.Reply] Cannot scan row", e)
+			logger.Error("[Model.Posts] Cannot scan row", e)
 			continue
 		}
 		if rpy.Valid {
@@ -215,30 +202,23 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 			  SELECT
     		    posts."id", posts."url", posts."user", posts."date",
     		    posts."vsb", posts."content", posts."media",
-			    CARDINALITY("likes") as "likes",
-			    CARDINALITY("shares") as "shares",
-			    rr."user" AS "replyTo", NULL AS "sharedBy",
-			    posts."date" AS "act"
+			    CARDINALITY("likes") as "likes", CARDINALITY("shares") as "shares",
+			    rr."user" AS "replyTo", NULL AS "sharedBy", posts."date" AS "act"
 			  FROM posts, rr
 			  WHERE posts."user" = $1 AND posts."id" = rr."id"
 			UNION ALL
 			  SELECT
-    		    "id", "url", "user", "date",
-    		    "vsb", "content", "media",
-			    CARDINALITY("likes") as "likes",
-			    CARDINALITY("shares") as "shares",
-			    NULL AS "replyTo", NULL AS "sharedBy",
-			    "date" AS "act"
+    		    "id", "url", "user", "date", "vsb", "content", "media",
+			    CARDINALITY("likes") as "likes", CARDINALITY("shares") as "shares",
+			    NULL AS "replyTo", NULL AS "sharedBy", "date" AS "act"
 			  FROM posts
 			  WHERE "user" = $1 AND "replying" IS NULL
 			UNION ALL
 			  SELECT
   			    posts."id", posts."url", posts."user", posts."date",
   			    shares."vsb", posts."content", posts."media",
-			    CARDINALITY("likes") as "likes",
-			    CARDINALITY("shares") as "shares",
-			    NULL AS "replyTo", shares."user" as "sharedBy",
-			    shares."date" AS "act"
+			    CARDINALITY("likes") as "likes", CARDINALITY("shares") as "shares",
+			    NULL AS "replyTo", shares."user" as "sharedBy", shares."date" AS "act"
 			  FROM posts, shares
 			  WHERE shares."user" = $1 AND posts."id" = shares."id"
 			ORDER BY "act" %s;`
@@ -249,7 +229,7 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 	}
 	r, e := conn.Query(qs, user)
 	if e != nil {
-		logger.Error("[Model.Reply] Cannot query", e)
+		logger.Error("[Model.Posts] Cannot query", e)
 		return nil, ErrDbInternal
 	}
 	list = make([]*Post, 0)
@@ -260,7 +240,7 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, p.Media.ToPqArray(),
+			&vsb, &p.Content, p.Media.ScanArray(),
 			&p.Likes, &p.Shares,
 			&rpt, &shb, &p.ActDate,
 		); e != nil {
@@ -287,7 +267,7 @@ func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.Posts] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()
@@ -295,21 +275,13 @@ func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 		return ErrNotFound
 	}
 
-	qs := ` INSERT INTO posts(
-  			  "id", "url", "user", "date",
-  			  "replying", "vsb", "content",
-			  "media"
-			)
-			VALUES (
-			  $1, $2, $3, $4,
-			  $5, $6, $7,
-			  $8
-			);`
+	qs := ` INSERT INTO posts("id", "url", "user", "date", "replying", "vsb", "content", "media")
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`
 	p.Date = p.Date.UTC()
 	r, e := conn.Exec(qs,
 		p.ID, p.Url, p.User, p.Date,
 		p.Replying, p.Vsb.String(), p.Content,
-		NewArray(attachments, logger),
+		NewArray(attachments).ValueArray(),
 	)
 	if e != nil {
 		logger.Error("[Model.Posts] Failed to execute", e)
@@ -329,20 +301,18 @@ func (db *PostDb) UpdatePost(p *Post, attachments []Img) error {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.Posts] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()
 
 	qs := ` UPDATE posts
-			SET
-			  "date" = $2, "content" = $3,
-			  "media" = $4
+			SET "date" = $2, "content" = $3, "media" = $4
 			WHERE "id" = $1;`
 	p.Date = p.Date.UTC()
-	r, e := conn.Exec(qs, p.ID, p.Date, p.Content, NewArray(attachments, logger))
+	r, e := conn.Exec(qs, p.ID, p.Date, p.Content, NewArray(attachments).ValueArray())
 	if e != nil {
-		logger.Error("[Model.Reply] Failed to execute", e)
+		logger.Error("[Model.Posts] Failed to execute", e)
 		return ErrDbInternal
 	}
 	if r == 0 {
@@ -359,7 +329,7 @@ func (db *PostDb) RemovePost(id string) error {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
+		logger.Error("[Model.Posts] Failed to open a connection", err)
 		return ErrDbInternal
 	}
 	defer conn.Close()
@@ -371,7 +341,7 @@ func (db *PostDb) RemovePost(id string) error {
 			WHERE "id" = $1;`
 	r, e := conn.Exec(qs, id)
 	if e != nil {
-		logger.Error("[Model.Reply] Failed to execute", e)
+		logger.Error("[Model.Posts] Failed to execute", e)
 		return ErrDbInternal
 	}
 	if r == 0 {
