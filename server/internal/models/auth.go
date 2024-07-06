@@ -14,7 +14,7 @@ type IAuthDb interface {
 
 type AuthDb struct {
 	lg   logging.Logger
-	pool *_db.ConnPool[*_db.RdConn]
+	pool _db.ConnPool[_db.RdConn]
 }
 
 var authIns *AuthDb = nil
@@ -23,7 +23,7 @@ func AuthInstance(lg logging.Logger) *AuthDb {
 	if authIns == nil {
 		authIns = &AuthDb{
 			lg:   lg,
-			pool: _db.AuthPool(nil, nil),
+			pool: _db.AuthPool(nil),
 		}
 	}
 	return authIns

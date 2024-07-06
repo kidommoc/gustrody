@@ -19,6 +19,7 @@ CREATE TYPE kp AS (
 );
 
 CREATE TYPE img AS (
+  "type" text,
   "url" text,
   "alt" text
 );
@@ -30,7 +31,7 @@ CREATE TYPE img AS (
 - nickname: `text`
 - summary *NULLABLE*: `text`
 - createdAt: `timestamp`
-- avatar *NULLABLE*: `text` as url
+- avatar *NULLABLE*: `img`
 - keys: `kp` as user's key pair
 - preference: `json`
 
@@ -40,7 +41,7 @@ CREATE TABLE IF NOT EXISTS users (
   "nickname" text NOT NULL,
   "summary" text,
   "createdAt" timestamp NOT NULL,
-  "avatar" text,
+  "avatar" img,
   "keys" kp NOT NULL,
   "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
 );
@@ -79,7 +80,7 @@ UPDATE users
 SET
   "nickname" = ${nickname},
   "summary" = ${summary},
-  "avatar" = ${avatar_url}
+  "avatar" = ROW(${media_type}, ${avatar_url},)
 WHERE "username" = ${username};
 ```
 
@@ -109,36 +110,57 @@ WHERE "username" = ${username};
 
 ## TABLE: foreign_users
 
-- username *PRIMARY, INDEX*: `varchar(60)`
+- username *PRIMARY, INDEX*: `text`
 - inbox: `text` as url
+- sharedInbox: `text` as url
 - pub: `text` as RSA public key
 
 ```sql
 CREATE TABLE IF NOT EXISTS foreign_users (
-  "username" varchar(60) PRIMARY KEY,
+  "user" text PRIMARY KEY,
+  "id" text,
   "inbox" text NOT NULL,
+  "sharedInbox" text NOT NULL,
   "pub" text NOT NULL
 );
 ```
+
+*Note*: `user` syntax is `username@domain`.
 
 ### Queries
 
 - insert a foreign user
 
 ```sql
-INSERT INTO foreign_users("username", "inbox", "pub")
-VALUES (${username}, ${inbox_url}, ${pub_key});
+INSERT INTO foreign_users(
+  "user", "id", "pub", "inbox", "sharedInbox"
+)
+VALUES (
+  ${username@domain}, ${userID}, ${public_key}
+  ${inbox_url}, ${shared_inbox_url}
+);
 ```
 
 - query a foreign user
 
 ```sql
+SELECT "id", "pub", "inbox", "sharedInbox"
+FROM foreign_users
+WHERE "user" = ${username};
+```
+
+- query all shared inboxes of a group of users
+
+```sql
+SELECT DISTINCT "sharedInbox"
+FROM foreign_users
+WHERE "user" IN ARRAY(${user_in_group}, ...);
 ```
 
 ## TABLE: follow
 
-- from *PRIMARY, INDEX*: `varchar(60)`
-- to *PRIMARY, INDEX*: `varchar(60)`
+- from *PRIMARY, INDEX*: `text`
+- to *PRIMARY, INDEX*: `text`
 
 CONSTRAINT:
 
@@ -146,8 +168,8 @@ CONSTRAINT:
 
 ```sql
 CREATE TABLE IF NOT EXISTS follow (
-  "from" varchar(60),
-  "to" varchar(60) CHECK ("to" <> "from"),
+  "from" text,
+  "to" text CHECK ("to" <> "from"),
   PRIMARY KEY ("from", "to")
 );
 
@@ -175,12 +197,14 @@ CREATE VIEW follow_info ("user", "followings", "followers") AS
     ON users."username" = followers.u;
 ```
 
+*Note*: `from` and `to` syntax is `username` for local user or `username@domain` for foreign user.
+
 ### Queries
 
 - query a user's followings:
 
 ``` sql
-SELECT "to" AS "following"
+SELECT "to" AS "followings"
 FROM follow
 WHERE "from" = ${username};
 ```
@@ -188,7 +212,7 @@ WHERE "from" = ${username};
 - query a user's followers:
 
 ``` sql
-SELECT "from" AS "follower"
+SELECT "from" AS "followers"
 FROM follow
 WHERE "to" = ${username};
 ```
@@ -205,7 +229,7 @@ WHERE "user" = ${username};
 
 ```sql
 -- SET
-INSERT INTO follow
+INSERT INTO follow("from", "to")
 VALUES (${from}, ${to});
 
 -- UNSET
@@ -231,7 +255,7 @@ CREATE TABLE IF NOT EXISTS posts (
   "id" varchar(36) NOT NULL,
   "url" text NOT NULL,
   "date" timestamp NOT NULL,
-  "user" varchar(60) NOT NULL,
+  "user" text NOT NULL,
   "replying" text,
   "vsb" vsb NOT NULL,
   "content" text NOT NULL,
@@ -243,7 +267,7 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE INDEX posters ON posts ("user");
 ```
 
-*Note*: `posts."user"` is not a foreign key to `users."username"`. After applying federal protocol, there will be posts from foreign sites storing in `posts` table, which cannot refer to a user in `users`.
+*Note*: `user` syntax is `username` for local users or `username@domain` for foreign users.
 
 ### Queries
 
@@ -256,7 +280,7 @@ INSERT INTO posts(
   "media"
 )
 VALUES (
-  ${postID}, ${url}, ${username}, ${date},
+  ${postID}, ${url}, ${user}, ${date},
   ${replying}, ${vsb}, ${content},
   ARRAY[
     ROW(${mediaUrl}, ${alt_text}), ...
@@ -271,7 +295,7 @@ UPDATE posts
 SET
   "date" = ${date}, "content" = ${content}, 
   "media" = ARRAY[
-    ROW(${mediaUrl}, ${alt_text}), ...
+    ROW(${media_type}, ${media_url}, ${alt_text}), ...
   ]
 WHERE "id" = ${postID};
 ```
@@ -307,8 +331,8 @@ WITH RECURSIVE rt AS (
 SELECT
   posts."id", posts."url", posts."user", posts."date",
   posts."vsb", posts."content", posts."media",
-  CARDINALITY(posts."likes") as "likes",
-  CARDINALITY(posts."shares") as "shares",
+  CARDINALITY(posts."likes") AS "likes",
+  CARDINALITY(posts."shares") AS "shares",
   posts."replying", rt."level"
 FROM posts
   JOIN rt ON posts."id" = rt."id"
@@ -326,8 +350,8 @@ WITH RECURSIVE rs AS (
 SELECT
   posts."id", posts."url", posts."user", posts."date",
   posts."vsb", posts."content", posts."media",
-  CARDINALITY(posts."likes") as "likes",
-  CARDINALITY(posts."shares") as "shares",
+  CARDINALITY(posts."likes") AS "likes",
+  CARDINALITY(posts."shares") AS "shares",
   posts."replying", rs."level"
 FROM posts
   JOIN rs ON posts."id" = rs."id"
@@ -338,29 +362,29 @@ ORDER BY "level" ASC, "date" DESC;
 
 ```sql
   WITH rr AS (
-    SELECT p1."id", p2."user" as "user"
+    SELECT p1."id", p2."user"
     FROM posts AS p1, posts AS p2
-    WHERE p1."user" = ${username} AND p2."id" = p1."replying"
+    WHERE p1."user" = ${user} AND p2."id" = p1."replying"
   )
   SELECT
     posts."id", posts."url", posts."user", posts."date",
     posts."vsb", posts."content", posts."media",
-    CARDINALITY("likes") as "likes",
-    CARDINALITY("shares") as "shares",
+    CARDINALITY("likes") AS "likes",
+    CARDINALITY("shares") AS "shares",
     rr."user" AS "replyTo", NULL AS "sharedBy",
     posts."date" AS "act"
   FROM posts, rr
-  WHERE posts."user" = ${username} AND posts."id" = rr."id"
+  WHERE posts."user" = ${user} AND posts."id" = rr."id"
 UNION ALL
   SELECT
     "id", "url", "user", "date",
     "vsb", "content", "media",
-    CARDINALITY("likes") as "likes",
-    CARDINALITY("shares") as "shares",
+    CARDINALITY("likes") AS "likes",
+    CARDINALITY("shares") AS "shares",
     NULL AS "replyTo", NULL AS "sharedBy",
     "date" AS "act"
   FROM posts
-  WHERE "user" = ${username} AND "replying" IS NULL
+  WHERE "user" = ${user} AND "replying" IS NULL
 ORDER BY "act" DESC;
 ```
 
@@ -377,14 +401,14 @@ WHERE "id" = ${postID};
 ```sql
 -- SET
 UPDATE posts
-SET "likes" = ARRAY_APPEND("likes", ${username})
+SET "likes" = ARRAY_APPEND("likes", ${user})
 WHERE
   "id" = ${postID}
-  AND ARRAY_POSITION("likes", ${username}) IS NULL;
+  AND ARRAY_POSITION("likes", ${user}) IS NULL;
 
 -- UNSET
 UPDATE posts
-SET "likes" = ARRAY_REMOVE("likes", ${username})
+SET "likes" = ARRAY_REMOVE("likes", ${user})
 WHERE "id" = ${postID};
 ```
 
@@ -402,26 +426,26 @@ WHERE "id" = ${postID};
 ```sql
 -- SET
 UPDATE posts
-SET "shares" = ARRAY_APPEND("shares", ${username})
+SET "shares" = ARRAY_APPEND("shares", ${user})
 WHERE
   "id" = ${postID}
-  AND ARRAY_POSITION("shares", ${username}) IS NULL;
+  AND ARRAY_POSITION("shares", ${user}) IS NULL;
 
 -- UNSET
 UPDATE posts
-SET "shares" = ARRAY_REMOVE("shares", ${username})
+SET "shares" = ARRAY_REMOVE("shares", ${user})
 WHERE "id" = ${postID};
 ```
 
 ## TABLE: shares
 
 - id *PRIMARY, FOREIGN*: `text` as uuid, referencing to `posts."id"`
-- user *PRIMARY, INDEX*: `varchar(60)`
+- user *PRIMARY, INDEX*: `text`
 - date: `timestamp`
 
 ```sql
 CREATE TABLE IF NOT EXISTS shares (
-  "user" varchar(60) NOT NULL,
+  "user" text NOT NULL,
   "id" varchar(36) NOT NULL,
   "date" timestamp NOT NULL,
   "vsb" vsb NOT NULL,
@@ -432,7 +456,7 @@ CREATE TABLE IF NOT EXISTS shares (
 CREATE INDEX sharers ON shares ("user");
 ```
 
-*Note*: `shares."user"` is not a foreign key to `users."username"`. After applying federal protocol, there will be shares from foreign sites storing in `shares` table, which cannot refer to a user in `users`.
+*Note*: `user` syntax is `username` for local users or `username@domain` for foreign users.
 
 ### Queries
 
@@ -442,12 +466,12 @@ CREATE INDEX sharers ON shares ("user");
 SELECT
   posts."id", posts."url", posts."user", posts."date",
   shares."vsb", posts."content", posts."media",
-  CARDINALITY("likes") as "likes",
-  CARDINALITY("shares") as "shares",
-  NULL AS "replyTo", shares."user" as "sharedBy",
+  CARDINALITY("likes") AS "likes",
+  CARDINALITY("shares") AS "shares",
+  NULL AS "replyTo", shares."user" AS "sharedBy",
   shares."date" AS "act"
 FROM posts, shares
-WHERE shares."user" = ${username} AND posts."id" = shares."id"
+WHERE shares."user" = ${user} AND posts."id" = shares."id"
 ORDER BY "act" DESC;
 ```
 
@@ -458,9 +482,9 @@ ORDER BY "act" DESC;
 ```sql
 -- SET
 INSERT INTO shares("user", "id", "date", "vsb")
-VALUES (${username}, ${postID}, ${date}, ${vsb});
+VALUES (${user}, ${postID}, ${date}, ${vsb});
 
 -- UNSET
 DELETE FROM shares
-WHERE "user" = ${username} and "id" = ${postID};
+WHERE "user" = ${user} and "id" = ${postID};
 ```

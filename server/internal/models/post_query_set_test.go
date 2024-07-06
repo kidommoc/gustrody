@@ -5,12 +5,11 @@ import (
 	"time"
 
 	"github.com/kidommoc/gustrody/internal/config"
-	"github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/test"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
 
-var pqstcfg = config.Config{
+var postcfg = config.Config{
 	PqUser:   "penguin",
 	PqSecret: "postgres",
 	RdSecret: "redis",
@@ -26,30 +25,30 @@ var pqstTable = []struct {
 	want  Post
 }{
 	{
-		pqstInput{Post: Post{
-			ID: "123", User: "foo", Replying: "",
-			Content: "bar",
+		input: pqstInput{Post: Post{
+			ID: "123", User: UD{"foo", "bar.sns"}, Replying: "",
+			Vsb: utils.Vsb_PUBLIC, Content: "example",
 		}, Imgs: []Img{
-			{Url: "1.png"},
-			{Url: "2.jpeg", Alt: "alt text"},
+			{Type: "image/png", Url: "1.png"},
+			{Type: "image/jpeg", Url: "2.jpeg", Alt: "alt text"},
 		}},
-		Post{ID: "123", Url: "/123", User: "foo",
+		want: Post{ID: "123", User: UD{"foo", "bar.sns"},
 			Replying: "", Vsb: utils.Vsb_PUBLIC, Content: "bar",
 			Media: Array[Img, *Img]{data: []Img{
-				{Url: "1.png"},
-				{Url: "2.jpeg", Alt: "alt text"},
+				{Type: "image/png", Url: "1.png"},
+				{Type: "image/jpeg", Url: "2.jpeg", Alt: "alt text"},
 			}}},
 	},
 	{
-		pqstInput{Post: Post{ID: "123", Content: "foobar"}, Imgs: []Img{
-			{Url: "1.png", Alt: "alt text"},
-			{Url: "2.jpeg"},
+		input: pqstInput{Post: Post{ID: "123", Content: "sample"}, Imgs: []Img{
+			{Type: "image/png", Url: "1.png", Alt: "alt text"},
+			{Type: "image/jpeg", Url: "2.jpeg"},
 		}},
-		Post{ID: "123", Url: "/123", User: "foo",
-			Replying: "", Vsb: utils.Vsb_PUBLIC, Content: "foobar",
+		want: Post{ID: "123", User: UD{"foo", "bar.sns"},
+			Replying: "", Vsb: utils.Vsb_PUBLIC, Content: "sample",
 			Media: Array[Img, *Img]{data: []Img{
-				{Url: "1.png", Alt: "alt text"},
-				{Url: "2.jpeg"},
+				{Type: "image/png", Url: "1.png", Alt: "alt text"},
+				{Type: "image/jpeg", Url: "2.jpeg"},
 			}}},
 	},
 }
@@ -58,13 +57,13 @@ func TestPostSetAndQuery(t *testing.T) {
 	d := time.Now().UTC()
 
 	logger := test.NewMockingLogger(t)
-	mp := db.MainPool(&pqstcfg, logger)
+	mp := newMockingPqPool(postcfg, logger)
 	postDb := &PostDb{lg: logger, pool: mp}
-
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
 			conn, _ := mp.Open()
-			conn.Exec("DELETE FROM posts WHERE \"id\" = $1;", v.input.ID)
+			defer conn.Close()
+			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 
@@ -86,13 +85,13 @@ func TestPostUpdate(t *testing.T) {
 	d1 := d.Add(time.Hour)
 
 	logger := test.NewMockingLogger(t)
-	mp := db.MainPool(&pqstcfg, logger)
+	mp := newMockingPqPool(postcfg, logger)
 	postDb := &PostDb{lg: logger, pool: mp}
-
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
 			conn, _ := mp.Open()
-			conn.Exec("DELETE FROM posts WHERE \"id\" = $1;", v.input.ID)
+			defer conn.Close()
+			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 
@@ -117,13 +116,13 @@ func TestPostRemove(t *testing.T) {
 	d := time.Now().UTC()
 
 	logger := test.NewMockingLogger(t)
-	mp := db.MainPool(&pqstcfg, logger)
+	mp := newMockingPqPool(postcfg, logger)
 	postDb := &PostDb{lg: logger, pool: mp}
-
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
 			conn, _ := mp.Open()
-			conn.Exec("DELETE FROM posts WHERE \"id\" = $1;", v.input.ID)
+			defer conn.Close()
+			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 

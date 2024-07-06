@@ -2,9 +2,13 @@
 -- must init tables afterwards
 
 DROP TABLE users CASCADE;
+DROP TABLE foreign_users CASCADE;
 DROP TABLE follow CASCADE;
 DROP TABLE posts CASCADE;
 DROP TABLE shares CASCADE;
+DROP TYPE vsb;
+DROP TYPE kp;
+DROP TYPE img;
 
 -- users
 

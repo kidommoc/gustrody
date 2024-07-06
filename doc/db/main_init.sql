@@ -21,6 +21,7 @@ CREATE TYPE kp AS (
 );
 
 CREATE TYPE img AS (
+  "type" text,
   "url" text,
   "alt" text
 );
@@ -38,9 +39,17 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
 CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
 
+CREATE TABLE IF NOT EXISTS foreign_users (
+  "user" text PRIMARY KEY,
+  "id" text,
+  "inbox" text NOT NULL,
+  "sharedInbox" text NOT NULL,
+  "pub" text NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS follow (
   "from" text,
-  "to" varchar(60) CHECK ("to" <> "from"),
+  "to" text CHECK ("to" <> "from"),
   PRIMARY KEY ("from", "to")
 );
 
@@ -71,7 +80,7 @@ CREATE TABLE IF NOT EXISTS posts (
   "id" varchar(36) PRIMARY KEY,
   "url" text NOT NULL,
   "date" timestamp NOT NULL,
-  "user" varchar(60) NOT NULL,
+  "user" text NOT NULL,
   "replying" text,
   "vsb" vsb NOT NULL,
   "content" text NOT NULL,
