@@ -16,8 +16,8 @@ When user's account is created, an `RSA` public/private key pair is generated au
 
 ```
 Signature:
-  keyId="https://id.of/user#main-key"
-  headers="(request-target) host date"
+  keyId="https://id.of/user#main-key",
+  headers="(request-target) host date",
   signature="signed_signature_string"
 ```
 
