@@ -8,7 +8,8 @@ import (
 
 type IUserForeign interface {
 	IsForeignExist(username UD) bool
-	GetForeignUser(username UD) (user ForeignUser, err error)
+	GetForeignUserByUD(username UD) (user ForeignUser, err error)
+	GetForeignUserByID(id string) (user ForeignUser, err error)
 	SetForeignUser(user *ForeignUser) error
 	GetInboxes(usernames []UD) (inboxes []string, err error)
 }
@@ -45,7 +46,7 @@ func (db *UserDb) IsForeignExist(username UD) bool {
 	return true
 }
 
-func (db *UserDb) GetForeignUser(username UD) (user ForeignUser, err error) {
+func (db *UserDb) GetForeignUserByUD(username UD) (user ForeignUser, err error) {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -58,6 +59,34 @@ func (db *UserDb) GetForeignUser(username UD) (user ForeignUser, err error) {
 			FROM foreign_users
 			WHERE "user" = $1;`
 	r := conn.QueryOne(qs, username)
+	if err := r.Scan(
+		&user.Username, &user.ID,
+		&user.Avatar, &user.AvtUrl,
+		&user.PubKey, &user.Inbox,
+	); err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return user, ErrNotFound
+		default:
+			logger.Error("[Model.UserForeign] Cannot scan row of foreign user.", err)
+		}
+	}
+	return user, nil
+}
+
+func (db *UserDb) GetForeignUserByID(id string) (user ForeignUser, err error) {
+	logger := db.lg
+	conn, err := db.pool.Open()
+	if err != nil {
+		logger.Error("[Model.UserForeign] Failed to open a connection", err)
+		return user, ErrDbInternal
+	}
+	defer conn.Close()
+
+	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
+			FROM foreign_users
+			WHERE "id" = $1;`
+	r := conn.QueryOne(qs, id)
 	if err := r.Scan(
 		&user.Username, &user.ID,
 		&user.Avatar, &user.AvtUrl,

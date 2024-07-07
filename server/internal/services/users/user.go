@@ -74,7 +74,7 @@ func (service *UserService) GetFollowings(username string) (list []*UserInfo, er
 
 		list = make([]*UserInfo, 0, len(l))
 		for _, u := range l {
-			info, err := service.GetInfo(u)
+			info, err := service.GetInfo(u.String())
 			if err != nil {
 				// handle error
 				continue
@@ -99,7 +99,7 @@ func (service *UserService) GetFollowers(username string) (list []*UserInfo, err
 
 		list = make([]*UserInfo, 0, len(l))
 		for _, u := range l {
-			info, err := service.GetInfo(u)
+			info, err := service.GetInfo(u.String())
 			if err != nil {
 				// handle error
 				continue

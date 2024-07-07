@@ -19,13 +19,22 @@ func routeUsers(router fiber.Router) {
 	router.Get("/preferences", mAuth, getUserPreferences)
 	router.Post("/preferences", mAuth, editUserPreferences)
 
-	router.Get("/:username", getUserProfile)
+	router.Get("/:username", switchByAccept(AcpMap{
+		"application/json":          getUserProfile,
+		"application/activity+json": getUserProfileFederal,
+	}))
 	router.Get("/:username/posts", func(c *fiber.Ctx) error {
 		c.Locals("forced", false)
 		return c.Next()
 	}, mAuth, getUserPosts)
-	router.Get("/:username/followings", getUserFollowings)
-	router.Get("/:username/followers", getUserFollowers)
+	router.Get("/:username/followings", switchByAccept(AcpMap{
+		"application/json":          getUserFollowings,
+		"application/activity+json": getUserFollowingsFederal,
+	}))
+	router.Get("/:username/followers", switchByAccept(AcpMap{
+		"application/json":          getUserFollowers,
+		"application/activity+json": getUserFollowersFederal,
+	}))
 	router.Put("/follow/:username", mAuth, follow)
 	router.Delete("/follow/:username", mAuth, unfollow)
 }
@@ -45,11 +54,7 @@ func registerUser(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.Register(
 		body.Username, body.Nickname, body.Password,
 	); err != nil {
@@ -77,11 +82,7 @@ func changePassword(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.UpdatePassword(username, body.Password); err != nil {
 		switch err {
 		//
@@ -103,11 +104,7 @@ func editUserProfile(c *fiber.Ctx) error {
 	c.BodyParser(body)
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.UpdateProfile(username, body); err != nil {
 		switch err {
 		//
@@ -127,11 +124,7 @@ func getUserPreferences(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	preferences, err := userService.GetPreferences(username)
 	if err != nil {
 		switch err {
@@ -155,11 +148,7 @@ func editUserPreferences(c *fiber.Ctx) error {
 	c.BodyParser(body)
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.UpdatePreferences(username, body); err != nil {
 		switch err {
 		// handle error
@@ -180,11 +169,7 @@ func getUserProfile(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	profile, err := userService.GetProfile(username)
 	if err != nil {
 		switch err {
@@ -214,18 +199,8 @@ func getUserPosts(c *fiber.Ctx) error {
 		c.SendString("Acquire username")
 	}
 
-	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
 	var postService *posts.PostService
-	err = services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	list, err := postService.GetByUser(username, target)
 	if err != nil {
 		switch err {
@@ -252,11 +227,7 @@ func getUserFollowings(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	list, err := userService.GetFollowings(username)
 	if err != nil {
 		switch err {
@@ -285,11 +256,7 @@ func getUserFollowers(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	list, err := userService.GetFollowers(username)
 	if err != nil {
 		switch err {
@@ -322,11 +289,7 @@ func follow(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.Follow(username, target); err != nil {
 		switch err {
 		case users.ErrSelfFollow:
@@ -361,11 +324,7 @@ func unfollow(c *fiber.Ctx) error {
 	}
 
 	var userService *users.UserService
-	err := services.Get(reflect.ValueOf(&userService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.Unfollow(username, target); err != nil {
 		switch err {
 		case users.ErrSelfFollow:

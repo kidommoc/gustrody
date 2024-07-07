@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS foreign_users (
   "pub" text NOT NULL
 );
 
+CREATE INDEX foreign_id ON foreign_users ("id");
+
 CREATE TABLE IF NOT EXISTS follow (
   "from" text,
   "to" text CHECK ("to" <> "from"),

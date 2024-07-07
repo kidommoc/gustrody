@@ -49,8 +49,14 @@ func TestForeignUserSetAndQuery(t *testing.T) {
 		test.AssertNoError(t, err, "Error when set: %+v")
 	})
 
-	t.Run("Query", func(t *testing.T) {
-		got, err := userDb.GetForeignUser(input.Username)
+	t.Run("Query UD", func(t *testing.T) {
+		got, err := userDb.GetForeignUserByUD(input.Username)
+		test.AssertNoError(t, err, "Error when query: %+v")
+		test.AssertEqual(t, input, got)
+	})
+
+	t.Run("Query ID", func(t *testing.T) {
+		got, err := userDb.GetForeignUserByID(input.ID)
 		test.AssertNoError(t, err, "Error when query: %+v")
 		test.AssertEqual(t, input, got)
 	})
@@ -79,7 +85,7 @@ func TestForeignUserUpdate(t *testing.T) {
 		err := userDb.SetForeignUser(&input)
 		test.AssertNoError(t, err, "Error when update: %+v")
 
-		got, err := userDb.GetForeignUser(input.Username)
+		got, err := userDb.GetForeignUserByUD(input.Username)
 		test.AssertNoError(t, err, "Error when query: %+v")
 		test.AssertEqual(t, input, got)
 	})

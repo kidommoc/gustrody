@@ -141,6 +141,8 @@ VALUES (
   ${avatarUrl}, ${avatarRemoteUrl},
   ${public_key}, ${inbox_url}
 );
+
+CREATE INDEX foreign_id ON foreign_users ("id");
 ```
 
 - query a foreign user

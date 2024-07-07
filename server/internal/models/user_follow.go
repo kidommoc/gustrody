@@ -7,9 +7,9 @@ type IUserFollow interface {
 	IsFollowing(username, target UD) bool
 	QueryUserFollowInfo(username string) (follows int64, followed int64, err error)
 	// uses: User.Username, User.Nickname, User.Avatar
-	QueryUserFollowings(username string) (list []string, err error)
+	QueryUserFollowings(username string) (list []UD, err error)
 	// uses: User.Username, User.Nickname, User.Avatar
-	QueryUserFollowers(username string) (list []string, err error)
+	QueryUserFollowers(username string) (list []UD, err error)
 	// at least one should be local user
 	SetFollow(from, to UD) error
 	// at least one should be local user
@@ -78,7 +78,7 @@ func (db *UserDb) QueryUserFollowInfo(username string) (follows int64, followed 
 //
 //   - DbInternal
 //   - NotFound "user"
-func (db *UserDb) QueryUserFollowings(username string) (list []string, err error) {
+func (db *UserDb) QueryUserFollowings(username string) (list []UD, err error) {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -99,9 +99,9 @@ func (db *UserDb) QueryUserFollowings(username string) (list []string, err error
 		return nil, ErrDbInternal
 	}
 
-	list = make([]string, 0)
+	list = make([]UD, 0)
 	for r.Next() {
-		var f string
+		var f UD
 		if e := r.Scan(&f); e != nil {
 			logger.Error("[Model.UserFollow] Cannot scan row", e)
 			continue
@@ -115,7 +115,7 @@ func (db *UserDb) QueryUserFollowings(username string) (list []string, err error
 //
 //   - DbInternal
 //   - NotFound "user"
-func (db *UserDb) QueryUserFollowers(username string) (list []string, err error) {
+func (db *UserDb) QueryUserFollowers(username string) (list []UD, err error) {
 	logger := db.lg
 	conn, err := db.pool.Open()
 	if err != nil {
@@ -136,9 +136,9 @@ func (db *UserDb) QueryUserFollowers(username string) (list []string, err error)
 		return nil, ErrDbInternal
 	}
 
-	list = make([]string, 0)
+	list = make([]UD, 0)
 	for r.Next() {
-		var f string
+		var f UD
 		if e := r.Scan(&f); e != nil {
 			logger.Error("[Model.UserFollow] Cannot scan row", e)
 			continue

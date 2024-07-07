@@ -42,8 +42,13 @@ func EnsureDirs(path string, isDir bool) {
 	}
 }
 
-var UsernameReg = regexp.MustCompile(`[A-z]{1}[A-z0-9]+`)
-var DomainReg = regexp.MustCompile(`([A-z0-9\-]+\.)+[A-z]{2,6}`)
+const UsernameRegLiteral = `[A-z]{1}[A-z0-9]+`
+const LocalUsernameRegLiteral = `[A-z]{1}[A-z0-9]{5,19}`
+const DomainRegLiteral = `([A-z0-9\-]+\.)+[A-z]{2,6}`
+
+var UsernameReg = regexp.MustCompile(UsernameRegLiteral)
+var LocalUsernameReg = regexp.MustCompile(LocalUsernameRegLiteral)
+var DomainReg = regexp.MustCompile(DomainRegLiteral)
 var UdReg = regexp.MustCompile(fmt.Sprintf(`^(%s)@(%s)$`,
 	UsernameReg, DomainReg,
 ))
@@ -53,8 +58,29 @@ func NewUUID() string {
 }
 
 // format: https://domain.site/users/username
+func UserIDReg(site string) *regexp.Regexp {
+	if !DomainReg.MatchString(site) {
+		return nil
+	}
+	site = strings.ReplaceAll(site, `.`, `\.`)
+	literal := fmt.Sprintf(`https://%s/users/(%s)`, site, LocalUsernameRegLiteral)
+	return regexp.MustCompile(literal)
+}
+
+// format: https://domain.site/users/username
 func GenerateUserID(username, site string) string {
 	return fmt.Sprintf("https://%s/users/%s", site, username)
+}
+
+const UUIDRegLiteral = `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+
+func PostIDReg(site string) *regexp.Regexp {
+	if !DomainReg.MatchString(site) {
+		return nil
+	}
+	site = strings.ReplaceAll(site, `.`, `\.`)
+	literal := fmt.Sprintf(`https://%s/posts/(%s)`, site, UUIDRegLiteral)
+	return regexp.MustCompile(literal)
 }
 
 // format: https://domain.site/posts/id

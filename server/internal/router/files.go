@@ -53,12 +53,8 @@ func uploadImg(c *fiber.Ctx) error {
 	}
 
 	var fileService *files.FileService
-	err := services.Get(reflect.ValueOf(&fileService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	path, mediaType, e := fileService.StoreImage(username, b)
+	services.Get(reflect.ValueOf(&fileService).Elem())
+	path, mediaType, e := fileService.StoreImage(b)
 	if e != nil {
 		c.Status(http.StatusInternalServerError)
 		return nil

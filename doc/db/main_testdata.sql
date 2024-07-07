@@ -42,7 +42,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   '90344833-7ecc-4ae2-b4ee-1eb1b2f335d1',
-  'austrody.sns/posts/90344833-7ecc-4ae2-b4ee-1eb1b2f335d1',
+  'https://austrody.sns/posts/90344833-7ecc-4ae2-b4ee-1eb1b2f335d1',
   'u1', NOW(),
   'public', 'p:u1-1', NULL
 );
@@ -52,7 +52,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   'f56b1307-959a-4f03-9422-81eb3d150071',
-  'austrody.sns/posts/f56b1307-959a-4f03-9422-81eb3d150071',
+  'https://austrody.sns/posts/f56b1307-959a-4f03-9422-81eb3d150071',
   'u2', NOW(),
   'public', 'p:u2-1', NULL
 );
@@ -75,7 +75,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   'dcbd25aa-3610-4e24-8e86-34105b96359b',
-  'austrody.sns/posts/dcbd25aa-3610-4e24-8e86-34105b96359b',
+  'https://austrody.sns/posts/dcbd25aa-3610-4e24-8e86-34105b96359b',
   'u1', NOW(),
   'public', 'p:u1-2', NULL
 );
@@ -85,7 +85,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   '6ae0210e-00b2-4837-abb8-b3a4242bacac',
-  'austrody.sns/posts/6ae0210e-00b2-4837-abb8-b3a4242bacac',
+  'https://austrody.sns/posts/6ae0210e-00b2-4837-abb8-b3a4242bacac',
   'u2', NOW(),
   'public', 'r:u1-1',
   '90344833-7ecc-4ae2-b4ee-1eb1b2f335d1'
@@ -96,7 +96,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   'b5078927-46a7-482e-9b60-8b602f6e2fe9',
-  'austrody.sns/posts/b5078927-46a7-482e-9b60-8b602f6e2fe9',
+  'https://austrody.sns/posts/b5078927-46a7-482e-9b60-8b602f6e2fe9',
   'u1', NOW(),
   'public', 'r:u2-r:u1-1',
   '6ae0210e-00b2-4837-abb8-b3a4242bacac'
@@ -107,7 +107,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   '70d94cf7-59f6-466b-bd79-c87512ffc86e',
-  'austrody.sns/posts/70d94cf7-59f6-466b-bd79-c87512ffc86e',
+  'https://austrody.sns/posts/70d94cf7-59f6-466b-bd79-c87512ffc86e',
   'u3', NOW(),
   'public', 'p:u3-1', NULL
 );
@@ -117,7 +117,7 @@ INSERT INTO posts(
   "vsb", "content", "replying" 
 ) VALUES (
   'a421c6a6-106f-4f34-a655-4a25fcc3a74c',
-  'austrody.sns/posts/a421c6a6-106f-4f34-a655-4a25fcc3a74c',
+  'https://austrody.sns/posts/a421c6a6-106f-4f34-a655-4a25fcc3a74c',
   'u3', NOW(),
   'public', 'r:u1-1',
   '90344833-7ecc-4ae2-b4ee-1eb1b2f335d1'

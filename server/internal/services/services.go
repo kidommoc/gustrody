@@ -9,6 +9,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/services/auth"
 	"github.com/kidommoc/gustrody/internal/services/files"
+	"github.com/kidommoc/gustrody/internal/services/net"
 	"github.com/kidommoc/gustrody/internal/services/posts"
 	"github.com/kidommoc/gustrody/internal/services/users"
 )
@@ -56,27 +57,33 @@ func Init() {
 	var up *users.UserService
 	ut := reflect.TypeOf(up)
 	if services[ut] == nil {
-		userDbs := users.UserDbs{
+		dbs := users.UserDbs{
 			Account: userModel, Info: userModel,
 			Follow: userModel, Auth: authModel,
 		}
-		services[ut] = users.NewService(userDbs, cfg, lg)
+		services[ut] = users.NewService(dbs, cfg, lg)
 	}
 
 	var pp *posts.PostService
 	pt := reflect.TypeOf(pp)
 	if services[pt] == nil {
-		postDbs := posts.PostDbs{
+		dbs := posts.PostDbs{
 			Query: postModel, Set: postModel,
 			Like: postModel, Share: postModel,
 		}
 		us, _ := services[ut].(*users.UserService)
-		services[pt] = posts.NewService(us, postDbs, cfg, lg)
+		services[pt] = posts.NewService(us, dbs, cfg, lg)
 	}
 
 	var fp *files.FileService
 	ft := reflect.TypeOf(fp)
 	if services[ft] == nil {
 		services[ft] = files.NewService(cfg, lg)
+	}
+
+	var np *net.NetService
+	nt := reflect.TypeOf(np)
+	if services[nt] == nil {
+		services[nt] = net.NewNetService(lg)
 	}
 }

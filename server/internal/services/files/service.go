@@ -17,7 +17,6 @@ type FileType string
 type File struct {
 	Filename string   `json:"filename"`
 	Ext      FileType `json:"ext"`
-	Uploader string   `json:"uploader"`
 }
 
 type FileService struct {

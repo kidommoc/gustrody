@@ -2,7 +2,6 @@ package users
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/utils"
@@ -13,13 +12,11 @@ type Preferences struct {
 	ShareVsb utils.Vsb `json:"shareVsb"`
 }
 
-var usernameReg = regexp.MustCompile("[A-z]{1}[A-z0-9]{5,}")
-
 // DB: Account, Auth
 func (service *UserService) Register(username, nickname, password string) error {
 	logger := service.lg
 
-	if !usernameReg.MatchString(username) {
+	if !utils.LocalUsernameReg.MatchString(username) {
 		return ErrSyntax
 	}
 	account := models.User{

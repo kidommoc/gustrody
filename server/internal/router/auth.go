@@ -42,11 +42,7 @@ func mAuth(c *fiber.Ctx) error {
 	}
 
 	var authService *auth.OauthService
-	err := services.Get(reflect.ValueOf(&authService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&authService).Elem())
 	username, err := authService.VerifyToken(bearer[1], session)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)
@@ -84,11 +80,7 @@ func login(c *fiber.Ctx) error {
 	}
 
 	var authService *auth.OauthService
-	err := services.Get(reflect.ValueOf(&authService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&authService).Elem())
 	session, oauth, err := authService.Login(body.Username, body.Password)
 	if err != nil {
 		c.Status(fiber.StatusUnauthorized)

@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/logging"
@@ -11,10 +12,10 @@ import (
 )
 
 func routePosts(router fiber.Router) {
-	router.Get("/:postID", func(c *fiber.Ctx) error {
-		c.Locals("forced", false)
-		return c.Next()
-	}, mAuth, getPost)
+	router.Get("/:postID", switchByAccept(AcpMap{
+		"application/json":          mOptionalAuth,
+		"application/activity+json": getPostFederal,
+	}), mAuth, getPost)
 	router.Get("/:postID/likes", func(c *fiber.Ctx) error {
 		c.Locals("forced", false)
 		return c.Next()
@@ -46,11 +47,7 @@ func getPost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	post, err := postService.Get(username, postID)
 	if err != nil {
 		switch err {
@@ -86,11 +83,7 @@ func getPostLikes(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	list, err := postService.GetLikes(username, postID)
 	if err != nil {
 		switch err {
@@ -123,11 +116,7 @@ func getPostShares(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	list, err := postService.GetShares(username, postID)
 	if err != nil {
 		switch err {
@@ -166,13 +155,9 @@ func newPost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.New(
-		username, body.Vsb, body.Content, body.Attachments,
+		username, body.Vsb, body.Content, time.Now(), body.Attachments,
 	); err != nil {
 		switch err {
 		case posts.ErrUserNotFound:
@@ -205,20 +190,17 @@ func replyPost(c *fiber.Ctx) error {
 	if !ok {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	content := new(contentBody)
-	if err := c.BodyParser(content); err != nil {
+	body := new(contentBody)
+	if err := c.BodyParser(body); err != nil {
 		c.Status(fiber.StatusBadRequest)
 		return c.SendString("Wrong request body.")
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.Reply(
-		username, postID, content.Vsb, content.Content, content.Attachments,
+		username, postID, body.Vsb, body.Content,
+		time.Now(), body.Attachments,
 	); err != nil {
 		switch err {
 		case posts.ErrUserNotFound:
@@ -261,11 +243,7 @@ func editPost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.Edit(
 		username, postID, content.Content, content.Attachments,
 	); err != nil {
@@ -305,11 +283,7 @@ func removePost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.Remove(username, postID); err != nil {
 		switch err {
 		case posts.ErrOwner:
@@ -341,11 +315,7 @@ func likePost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.Like(username, postID); err != nil {
 		switch err {
 		case posts.ErrPostNotFound:
@@ -374,11 +344,7 @@ func unlikePost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.Unlike(username, postID); err != nil {
 		switch err {
 		case posts.ErrPostNotFound:
@@ -411,12 +377,8 @@ func sharePost(c *fiber.Ctx) error {
 	vsb := c.Query("visibility")
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	if err := postService.Share(username, postID, vsb); err != nil {
+	services.Get(reflect.ValueOf(&postService).Elem())
+	if err := postService.Share(username, postID, time.Now(), vsb); err != nil {
 		switch err {
 		case posts.ErrPostNotFound:
 			c.Status(fiber.StatusNotFound)
@@ -444,11 +406,7 @@ func unsharePost(c *fiber.Ctx) error {
 	}
 
 	var postService *posts.PostService
-	err := services.Get(reflect.ValueOf(&postService).Elem())
-	if err != nil {
-		// ?
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
+	services.Get(reflect.ValueOf(&postService).Elem())
 	if err := postService.Unshare(username, postID); err != nil {
 		switch err {
 		case posts.ErrPostNotFound:

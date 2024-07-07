@@ -14,9 +14,9 @@ const (
 	TYPE_PNG  FileType = "png"
 )
 
-func (service *FileService) StoreImage(user string, buf []byte) (url string, mediaType string, err error) {
+func (service *FileService) StoreImage(buf []byte) (url string, mediaType string, err error) {
 	logger := service.lg
-	img := File{Uploader: user}
+	img := File{}
 
 	// digest []byte for filename
 	// conflict may not resolved
