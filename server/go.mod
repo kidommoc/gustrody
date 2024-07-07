@@ -3,12 +3,12 @@ module github.com/kidommoc/gustrody
 go 1.21.6
 
 require (
-	github.com/gofiber/fiber/v2 v2.52.4 // direct
+	github.com/gofiber/fiber/v2 v2.52.5 // direct
 	github.com/golang-jwt/jwt/v5 v5.2.1 // direct
 	github.com/google/uuid v1.5.0 // direct
 	github.com/joho/godotenv v1.5.1 // direct
-	github.com/redis/go-redis/v9 v9.5.3 // direct
 	github.com/lib/pq v1.10.9 // direct
+	github.com/redis/go-redis/v9 v9.5.3 // direct
 )
 
 require (
