@@ -11,7 +11,7 @@ Follow a user.
 ```json
 {
   "@context": [],
-  "id": "https://id.of/actor/activity/uuid",
+  "id": "https://id.of/actor#follow/user@domain",
   "type": "Follow",
   "actor": "https://id.of/actor",
   "object": "https://id.of/actorToFollow"
@@ -25,11 +25,11 @@ Accept a follow request.
 ```json
 {
   "@context": [],
-  "id": "https://id.of/actor/activity/uuid",
+  "id": "https://instance.url/activity/tempID",
   "type": "Accept",
   "actor": "https://id.of/actor",
   "object": {
-    "id": "https://id.of/following",
+    "id": "https://id.of/follow",
     "type": "Follow",
     "andOther": "properties"
   }
@@ -43,11 +43,11 @@ Reject a follow request.
 ```json
 {
   "@context": [],
-  "id": "https://id.of/actor/activity/uuid",
+  "id": "https://instance.url/activity/tempID",
   "type": "reject",
   "actor": "https://id.of/actor",
   "object": {
-    "id": "https://id.of/following",
+    "id": "https://id.of/follow",
     "type": "Follow",
     "andOther": "properties"
   }
@@ -61,7 +61,7 @@ Reject a follow request.
 ```json
 {
   "@context": [],
-  "id": "https://id.of/actor/activity/uuid",
+  "id": "https://instance.url/activity/tempID",
   "type": "Undo",
   "actor": "https://id.of/actor",
   "object": "https://id.of/activityToUndo"
@@ -83,7 +83,7 @@ Publish a new note.
 ```json
 {
   "@context": [],
-  "id": "https://instance.url/users/actor/status/noteID/activity",
+  "id": "https://instance.url/activity/tempID",
   "type": "Create",
   "actor": "https://id.of/actor",
   "published": "utc-date",
@@ -104,7 +104,7 @@ Update a existing note.
 ```json
 {
   "@context": [],
-  "id": "",
+  "id": "https://instance.url/activity/tempID",
   "type": "Update",
   "actor": "https://id.of/actor",
   "published": "utc-date",
@@ -123,7 +123,7 @@ Delete a existing note.
 ```json
 {
   "@context": [],
-  "id": "",
+  "id": "https://instance.url/activity/tempID",
   "type": "Delete",
   "actor": "https://id.of/actor",
   "published": "utc-date",
@@ -138,7 +138,7 @@ Like a note.
 ```json
 {
   "@context": [],
-  "id": "https://instance.url/users/actorID#likes/id",
+  "id": "https://id.of/actor#likes/id",
   "type": "Like",
   "actor": "https://id.of/actor",
   "object": "https://id.of/noteToLike"
@@ -152,13 +152,13 @@ Share a note.
 ```json
 {
   "@context": [],
-  "id": "https://instance.url/users/actorID/status/forwardID/activity",
+  "id": "https://id.of/actor#shares/id",
   "type": "Announce",
   "actor": "https://id.of/actor",
   "published": "utc-date",
   "to": [],
   "cc": [],
-  "object": "https://id.of/noteToForward"
+  "object": "https://id.of/noteToShare"
 }
 ```
 
@@ -169,7 +169,7 @@ Share a note.
 ```json
 {
   "@context": [],
-  "id": "https://instance.url/tempID",
+  "id": "https://instance.url/activity/tempID",
   "type": "Undo",
   "actor": "https://id.of/actor",
   "object": "https://id.of/activityIDToUndo"
