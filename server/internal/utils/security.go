@@ -96,18 +96,11 @@ func Sign(pri *rsa.PrivateKey, msg string) string {
 	return string(encoded)
 }
 
-func Verify(pub *rsa.PublicKey, signed, compare string) bool {
+func Verify(pub *rsa.PublicKey, signed, compare string) error {
 	hashed := SHA256Hash(compare)
 	decoded, err := base64.StdEncoding.DecodeString(signed)
 	if err != nil {
-		fmt.Println(err)
-		return false
+		return err
 	}
-	err = rsa.VerifyPKCS1v15(pub, crypto.SHA256, hashed, []byte(decoded))
-	if err == nil {
-		return true
-	} else {
-		fmt.Println(err)
-		return false
-	}
+	return rsa.VerifyPKCS1v15(pub, crypto.SHA256, hashed, []byte(decoded))
 }

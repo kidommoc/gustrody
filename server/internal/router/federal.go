@@ -1,8 +1,14 @@
 package router
 
 import (
+	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/logging"
+	"github.com/kidommoc/gustrody/internal/services"
+	"github.com/kidommoc/gustrody/internal/services/federal"
 )
 
 func routeFederal(router fiber.Router) {
@@ -17,8 +23,31 @@ func sigVerify(c *fiber.Ctx) error {
 
 func webfinger(c *fiber.Ctx) error {
 	logger := logging.Get()
-	logger.Info("[FEDERAL] webfinger.")
-	return c.SendStatus(fiber.StatusOK)
+	acct := c.Query("resource")
+	if acct == "" || !strings.HasPrefix(acct, "acct:") {
+		c.Status(fiber.StatusBadRequest)
+		return c.SendString("Wrong resource.")
+	}
+	username := strings.TrimPrefix(acct, "acct:")
+	tmppts := strings.Split(username, "@")
+	if len(tmppts) < 2 {
+		c.Status(fiber.StatusBadRequest)
+		return c.SendString("Wrong resource.")
+	}
+
+	var federalService *federal.FederalService
+	services.Get(reflect.ValueOf(&federalService).Elem())
+	result, err := federalService.Webfinger(tmppts[0], strings.Join(tmppts[1:], ""))
+	if err != nil {
+		switch err {
+		case federal.ErrNotFound:
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+	}
+	msg := fmt.Sprintf("[FEDERAL] Webfinger: %s.", username)
+	logger.Info(msg)
+	c.Set("Content-Type", "application/jrd+json")
+	return c.JSON(result)
 }
 
 func inbox(c *fiber.Ctx) error {

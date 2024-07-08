@@ -8,6 +8,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/services/auth"
+	"github.com/kidommoc/gustrody/internal/services/federal"
 	"github.com/kidommoc/gustrody/internal/services/files"
 	"github.com/kidommoc/gustrody/internal/services/net"
 	"github.com/kidommoc/gustrody/internal/services/posts"
@@ -20,7 +21,9 @@ var ErrWrongType = errors.New("WrongType")
 
 var services = make(map[reflect.Type]interface{})
 
-// using: Get(reflect.ValueOf(&ptr).Elem())
+// Using:
+//
+//	Get(reflect.ValueOf(&service_ptr).Elem())
 func Get(v reflect.Value) error {
 	t := v.Type()
 	if t.Kind() != reflect.Pointer {
@@ -61,7 +64,8 @@ func Init() {
 			Account: userModel, Info: userModel,
 			Follow: userModel, Auth: authModel,
 		}
-		services[ut] = users.NewService(dbs, cfg, lg)
+		up = users.NewService(dbs, cfg, lg)
+		services[ut] = up
 	}
 
 	var pp *posts.PostService
@@ -71,8 +75,7 @@ func Init() {
 			Query: postModel, Set: postModel,
 			Like: postModel, Share: postModel,
 		}
-		us, _ := services[ut].(*users.UserService)
-		services[pt] = posts.NewService(us, dbs, cfg, lg)
+		services[pt] = posts.NewService(up, dbs, cfg, lg)
 	}
 
 	var fp *files.FileService
@@ -84,6 +87,19 @@ func Init() {
 	var np *net.NetService
 	nt := reflect.TypeOf(np)
 	if services[nt] == nil {
-		services[nt] = net.NewNetService(lg)
+		np = net.NewNetService(lg)
+		services[nt] = np
+	}
+
+	var fdp *federal.FederalService
+	fdt := reflect.TypeOf(fdp)
+	if services[fdt] == nil {
+		dbs := federal.FederalDbs{
+			UserInfo: userModel, UserAccount: userModel,
+			UserForeign: userModel, UserFollow: userModel,
+			PostQuery: postModel, PostSet: postModel,
+			PostLike: postModel, PostShare: postModel,
+		}
+		services[fdt] = federal.NewService(np, dbs, cfg, lg)
 	}
 }

@@ -15,7 +15,7 @@ func TestSignAndVerify(t *testing.T) {
 	t.Log("Signed: ", []byte(signed))
 
 	pubKey := GetPublicKey(pubKeyPem)
-	if !Verify(pubKey, signed, msg) {
-		t.Errorf("Cannot verify")
+	if err := Verify(pubKey, signed, msg); err != nil {
+		t.Errorf("Cannot verify: %s", err)
 	}
 }

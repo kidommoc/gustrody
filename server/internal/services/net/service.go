@@ -1,6 +1,9 @@
 package net
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 
@@ -38,6 +41,7 @@ type cnode struct {
 }
 
 type Client struct {
+	lg      logging.Logger
 	client  *http.Client
 	service *NetService
 }
@@ -60,6 +64,7 @@ func (service *NetService) HttpClient() *Client {
 	}
 
 	client := Client{
+		lg:      service.lg,
 		client:  service.clientPool.client,
 		service: service,
 	}
@@ -94,6 +99,34 @@ func (client *Client) Close() {
 	client.service = nil
 }
 
-func (client *Client) Do(req *http.Request) (res *http.Response, err error) {
-	return client.client.Do(req)
+func (client *Client) Do(req *http.Request, body []byte) (response *Response, err error) {
+	logger := client.lg
+	if body != nil {
+		b := io.NopCloser(bytes.NewBuffer(body))
+		req.Body = b
+	}
+	res, err := client.client.Do(req)
+	if err != nil {
+		logger.Error("[Net] Failed to send request.", err)
+		return nil, err
+	}
+	if res.StatusCode > http.StatusBadRequest {
+		err := fmt.Errorf("status code: %d", res.StatusCode)
+		logger.Error("[Net] Response not ok.", err)
+		return nil, err
+	}
+	var resBody []byte
+	if _, err = res.Body.Read(resBody); err != nil {
+		logger.Error("[Net] Failed to read response body.", err)
+		return nil, err
+	}
+	return &Response{
+		Header: res.Header,
+		Body:   resBody,
+	}, nil
+}
+
+type Response struct {
+	Header http.Header
+	Body   []byte
 }
