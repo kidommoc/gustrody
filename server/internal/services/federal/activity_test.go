@@ -27,7 +27,7 @@ var actTable = []struct {
 	{models.UD{Username: "u2"}, "foobar", "/users/u2/inbox"},
 }
 
-func startServer(t *testing.T, dbs FederalDbs) {
+func startActServer(t *testing.T, dbs FederalDbs) {
 	service := NewService(nil, dbs, actcfg, test.NewMockingLogger(t))
 
 	app := fiber.New()
@@ -62,7 +62,7 @@ func TestSendActivity(t *testing.T) {
 	netService := net.NewNetService(logger)
 	service := NewService(netService, dbs, actcfg, logger)
 
-	go startServer(t, dbs)
+	go startActServer(t, dbs)
 	time.Sleep(2 * time.Second) // wait for mocking foreign server starting
 	t.Log("...starts.")
 
@@ -75,7 +75,7 @@ func TestSendActivity(t *testing.T) {
 		dst := "http://" + actcfg.Site + v.p
 		err := service.sendActivity(v.u, []byte(v.b), []string{dst})
 		test.AssertNoError(t, err,
-			fmt.Sprintf("when %s sends to %s", v.u.String(), v.p),
+			fmt.Sprintf("when %s sends to %s: ", v.u.String(), v.p)+"%v",
 		)
 	}
 }

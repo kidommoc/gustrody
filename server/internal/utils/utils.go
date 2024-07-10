@@ -90,9 +90,23 @@ func GeneratePostID(id, site string) string {
 	return fmt.Sprintf("https://%s/posts/%s", site, id)
 }
 
-// convert time.Time to RFC3339 string
+// convert time.Time to RFC3339 string. format:
 //
-// format: 2006-01-02T15:04:05Z70:00
+//	2006-01-02T15:04:05Z // timezone 0
+//	2006-01-02T15:04:05(+|-)07:00 // timezone +/-
 func DateString(d time.Time) string {
 	return d.Format(time.RFC3339)
+}
+
+// convert RFC3339 string to time.Time. format:
+//
+//	2006-01-02T15:04:05Z // timezone 0
+//	2006-01-02T15:04:05(+|-)07:00 // timezone +/-
+func ParseDateString(s string) *time.Time {
+	d, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return &d
+	} else {
+		return nil
+	}
 }

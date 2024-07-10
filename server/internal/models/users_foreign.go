@@ -15,12 +15,13 @@ type IUserForeign interface {
 }
 
 type ForeignUser struct {
-	Username UD     `json:"user"`
-	ID       string `json:"id"`
-	Avatar   string `json:"avatar"`
-	AvtUrl   string `json:"avatarUrl"`
-	Inbox    string `json:"inbox"`
-	PubKey   string `json:"pub"`
+	Username  UD     `json:"user"`
+	ID        string `json:"id"`
+	Avatar    string `json:"avatar"`
+	AvtUrl    string `json:"avatarUrl"`
+	Inbox     string `json:"inbox"`
+	Followers string `json:"followers"`
+	PubKey    string `json:"pub"`
 }
 
 func (db *UserDb) IsForeignExist(username UD) bool {
@@ -55,14 +56,13 @@ func (db *UserDb) GetForeignUserByUD(username UD) (user ForeignUser, err error) 
 	}
 	defer conn.Close()
 
-	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
+	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox", "followers"
 			FROM foreign_users
 			WHERE "user" = $1;`
 	r := conn.QueryOne(qs, username)
 	if err := r.Scan(
-		&user.Username, &user.ID,
-		&user.Avatar, &user.AvtUrl,
-		&user.PubKey, &user.Inbox,
+		&user.Username, &user.ID, &user.Avatar, &user.AvtUrl,
+		&user.PubKey, &user.Inbox, &user.Followers,
 	); err != nil {
 		switch err {
 		case sql.ErrNoRows:
@@ -83,14 +83,14 @@ func (db *UserDb) GetForeignUserByID(id string) (user ForeignUser, err error) {
 	}
 	defer conn.Close()
 
-	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
+	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox", "followers"
 			FROM foreign_users
 			WHERE "id" = $1;`
 	r := conn.QueryOne(qs, id)
 	if err := r.Scan(
 		&user.Username, &user.ID,
 		&user.Avatar, &user.AvtUrl,
-		&user.PubKey, &user.Inbox,
+		&user.PubKey, &user.Inbox, &user.Followers,
 	); err != nil {
 		switch err {
 		case sql.ErrNoRows:
@@ -113,13 +113,13 @@ func (db *UserDb) SetForeignUser(user *ForeignUser) error {
 
 	if db.IsForeignExist(user.Username) {
 		qs := ` UPDATE foreign_users
-				SET "avatar" = $2, "avatarUrl" = $3
-				WHERE "user" = $1; `
-		_, err = conn.Exec(qs, user.Username, user.Avatar, user.AvtUrl)
+				SET "avatar" = $2, "avatarUrl" = $3, "pub" = $4, "inbox" = $5, "followers" = $6
+				WHERE "user" = $1;`
+		_, err = conn.Exec(qs, user.Username, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox, user.Followers)
 	} else {
-		qs := ` INSERT INTO foreign_users("user", "id", "avatar", "avatarUrl", "pub", "inbox")
-				VALUES ($1, $2, $3, $4, $5, $6);`
-		_, err = conn.Exec(qs, user.Username, user.ID, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox)
+		qs := ` INSERT INTO foreign_users("user", "id", "avatar", "avatarUrl", "pub", "inbox", "followers")
+				VALUES ($1, $2, $3, $4, $5, $6, $7);`
+		_, err = conn.Exec(qs, user.Username, user.ID, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox, user.Followers)
 	}
 	if err != nil {
 		logger.Error("[Model.UserForeign] Failed to execute set", err)

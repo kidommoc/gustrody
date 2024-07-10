@@ -43,12 +43,12 @@ func TestSignAndVerify(t *testing.T) {
 		}{pub, pri}
 
 		signed, err := service.Sign(v.u, v.h)
-		test.AssertNoError(t, err)
+		test.AssertNoError(t, err, "Error when sign: %v")
 		v.h["signature"] = signed
 
 		if len(v.b) != 0 {
 			digest, err := service.Digest(v.u, v.b)
-			test.AssertNoError(t, err)
+			test.AssertNoError(t, err, "Error when digest: %v")
 			v.h["digest"] = digest
 		}
 

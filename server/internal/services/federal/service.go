@@ -81,7 +81,9 @@ func (service *FederalService) Webfinger(username, site string) (wf WF, err erro
 func (service *FederalService) requestWebfinger(user models.UD) (url string, err error) {
 	logger := service.lg
 	client := service.net.HttpClient()
-	rawUrl := fmt.Sprintf("https://%s/.well-known/webfinger/?resource=acct:%s",
+
+	// try http
+	rawUrl := fmt.Sprintf("http://%s/.well-known/webfinger/?resource=acct:%s",
 		user.Domain, user.String(),
 	)
 	u, err := _url.Parse(rawUrl)
@@ -91,14 +93,27 @@ func (service *FederalService) requestWebfinger(user models.UD) (url string, err
 	}
 
 	header := http.Header{}
-	header.Add("Accept", "application/jrd+json")
 	req := http.Request{Method: "GET", URL: u, Header: header}
 
 	res, err := client.Do(&req, nil)
 	if err != nil {
-		logger.Error("[Federal.reqWebfinger] Failed to send.", err)
-		return "", ErrRequest
+		// try https
+		rawUrl := fmt.Sprintf("https://%s/.well-known/webfinger/?resource=acct:%s",
+			user.Domain, user.String(),
+		)
+		u, err := _url.Parse(rawUrl)
+		if err != nil {
+			logger.Error("[Federal.reqWebfinger] Failed to parse url.", err)
+			return "", ErrSyntax
+		}
+		req.URL = u
+		res, err = client.Do(&req, nil)
+		if err != nil {
+			logger.Error("[Federal.reqWebfinger] Failed to send.", err)
+			return "", ErrRequest
+		}
 	}
+
 	var wf WF
 	err = json.Unmarshal(res.Body, &wf)
 	if err != nil {

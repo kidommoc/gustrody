@@ -115,8 +115,9 @@ func (client *Client) Do(req *http.Request, body []byte) (response *Response, er
 		logger.Error("[Net] Response not ok.", err)
 		return nil, err
 	}
-	var resBody []byte
-	if _, err = res.Body.Read(resBody); err != nil {
+	resBody, err := io.ReadAll(res.Body)
+	defer res.Body.Close()
+	if err != nil {
 		logger.Error("[Net] Failed to read response body.", err)
 		return nil, err
 	}

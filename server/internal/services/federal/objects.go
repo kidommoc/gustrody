@@ -2,7 +2,6 @@ package federal
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/kidommoc/gustrody/internal/models"
@@ -22,11 +21,6 @@ var (
 
 func expandCtx(s string) string {
 	parts := strings.Split(s, ":")
-	if len(parts) < 2 || !regexp.MustCompile("[A-z]+").MatchString(parts[0]) {
-		// no need to expand
-		return s
-	}
-
 	rep := ctxMap[parts[0]]
 	if rep == "" {
 		return s

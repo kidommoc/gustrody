@@ -36,3 +36,24 @@ func (db *mockingUserAccountDb) QueryUserPreferences(username string) (pf *model
 func (db *mockingUserAccountDb) UpdateUserPreferences(username string, pf *models.Preferences) error {
 	return nil
 }
+
+type mockingUserInfoDb struct {
+}
+
+func newMockingUserInfoDb() *mockingUserInfoDb {
+	return &mockingUserInfoDb{}
+}
+
+func (db *mockingUserInfoDb) IsUserExist(username string) bool {
+	return true
+}
+
+// never used
+func (db *mockingUserInfoDb) QueryUser(username string) (user models.User, err error) {
+	return user, nil
+}
+
+// never used
+func (db *mockingUserInfoDb) UpdateUser(user *models.User) error {
+	return nil
+}

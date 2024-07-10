@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS foreign_users (
   "avatar" text,
   "avatarUrl" text,
   "inbox" text NOT NULL,
+  "followers" text NOT NULL,
   "pub" text NOT NULL
 );
 ```
@@ -134,12 +135,13 @@ CREATE TABLE IF NOT EXISTS foreign_users (
 
 ```sql
 INSERT INTO foreign_users(
-  "user", "id", "avatar", "avatarUrl", "pub", "inbox"
+  "user", "id", "avatar", "avatarUrl",
+  "pub", "inbox", "followers"
 )
 VALUES (
   ${username@domain}, ${userID},
   ${avatarUrl}, ${avatarRemoteUrl},
-  ${public_key}, ${inbox_url}
+  ${public_key}, ${inbox_url}, ${followers_url}
 );
 
 CREATE INDEX foreign_id ON foreign_users ("id");
@@ -148,7 +150,9 @@ CREATE INDEX foreign_id ON foreign_users ("id");
 - query a foreign user
 
 ```sql
-SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
+SELECT
+  "user", "id", "avatar", "avatarUrl",
+  "pub", "inbox", "followers"
 FROM foreign_users
 WHERE "user" = ${username@domain};
 ```
