@@ -12,6 +12,10 @@ import (
 	"github.com/kidommoc/gustrody/internal/logging"
 )
 
+type IFileService interface {
+	StoreImage(buf []byte) (url string, mediaType string, err error)
+}
+
 type FileType string
 
 type File struct {
@@ -21,14 +25,16 @@ type File struct {
 
 type FileService struct {
 	lg     logging.Logger
-	site   string
+	scheme string
+	domain string
 	imgDir string
 }
 
 func NewService(cfg config.Config, lg logging.Logger) *FileService {
 	return &FileService{
 		lg:     lg,
-		site:   cfg.Site,
+		scheme: cfg.Scheme,
+		domain: cfg.Domain,
 		imgDir: cfg.ImgDir,
 	}
 }

@@ -14,7 +14,8 @@ import (
 )
 
 var wfcfg = config.Config{
-	Site: "austrody.sns",
+	Scheme: "http",
+	Domain: "austrody.sns",
 }
 
 func TestServeWebfinger(t *testing.T) {
@@ -23,9 +24,9 @@ func TestServeWebfinger(t *testing.T) {
 	dbs := FederalDbs{
 		UserInfo: mUInfDb,
 	}
-	service := NewService(nil, dbs, wfcfg, logger)
+	service := NewService(nil, nil, dbs, wfcfg, logger)
 
-	wf, err := service.Webfinger("penguin", wfcfg.Site)
+	wf, err := service.Webfinger("penguin@" + wfcfg.Domain)
 	test.AssertNoError(t, err, "when serve: %v")
 	result, _ := json.Marshal(wf)
 	t.Logf("%s", result)
@@ -67,7 +68,7 @@ func TestRequestWebfinger(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 	dbs := FederalDbs{}
 	netService := net.NewNetService(logger)
-	service := NewService(netService, dbs, actcfg, logger)
+	service := NewService(netService, nil, dbs, actcfg, logger)
 
 	go startWFServer()
 	time.Sleep(2 * time.Second)

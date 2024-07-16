@@ -44,19 +44,27 @@ type MediaType string
 
 type MediaObj struct {
 	Object
-	MediaType MediaType `json:"mediaType"`
+	MediaType MediaType `json:"mediaType,omitempty"`
 	Url       string    `json:"url"`
 	Name      string    `json:"name,omitempty"`
 }
 
-func makeMedia(img *models.Img) MediaObj {
+func (service *FederalService) makeDocumentImage(img *models.Img) MediaObj {
 	return MediaObj{
 		Object: Object{
 			Type: "Document",
-			ID:   img.Url,
+			ID:   service.domain + img.Url,
 		},
 		MediaType: MediaType(img.Type), // !!need check
-		Url:       img.Url,
+		Url:       service.domain + img.Url,
+	}
+}
+
+func (service *FederalService) makeImage(img *models.Img) MediaObj {
+	return MediaObj{
+		Object:    Object{Type: "Image"},
+		MediaType: MediaType(img.Type), // !!need check
+		Url:       service.domain + img.Url,
 	}
 }
 
@@ -64,7 +72,6 @@ type PersonObj struct {
 	Object
 	Username  string `json:"preferredUsername"`
 	Nickname  string `json:"name"`
-	Date      string `json:"published"`
 	Inbox     string `json:"inbox"`
 	Outbox    string `json:"outbox"`
 	Endpoints struct {

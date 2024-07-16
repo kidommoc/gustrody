@@ -24,7 +24,7 @@ type NoteActivity struct {
 }
 
 func (service *FederalService) tempActivityID() string {
-	return fmt.Sprintf("https://%s/activity/%s", service.site, utils.NewUUID())
+	return fmt.Sprintf("%s://%s/activity/%s", service.scheme, service.domain, utils.NewUUID())
 }
 
 func (service *FederalService) errSendActivity(loc string, err error) error {
@@ -47,13 +47,13 @@ func (service *FederalService) sendActivity(actor models.UD, body []byte, dst []
 
 		header := http.Header{}
 		header.Add("Content-Type", "application/activity+json")
-		header.Add("Host", service.site)
-		d := utils.DateString(time.Now())
+		header.Add("Host", service.domain)
+		d := utils.HttpDateString(time.Now())
 		header.Add("Date", d)
 
 		headerMap := map[string]string{
 			"method": "post", "path": url.Path,
-			"host": service.site, "date": d,
+			"host": service.domain, "date": d,
 		}
 		signature, err := service.Sign(actor.String(), headerMap)
 		if err != nil {
@@ -82,4 +82,25 @@ func (service *FederalService) sendActivity(actor models.UD, body []byte, dst []
 		}
 	}
 	return nil
+}
+
+func (service *FederalService) getInboxes(tgt []models.UD) (inboxes []string, err error) {
+	logger := service.lg
+	for _, user := range tgt {
+		if user.Domain != "" && !service.db.UserForeign.IsForeignExist(user) {
+			id, err := service.requestWebfinger(user)
+			if err != nil {
+				logger.Warning("[Federal.getInboxes] Failed to request webfinger.", "user-domain", user)
+				continue
+			}
+			if _, err = service.GetForeignPerson(id); err != nil { // not implemented yet
+				logger.Warning("[Federal.getInboxes] Failed to get foreign person.", "user id", id)
+			}
+		}
+	}
+	inboxes, err = service.db.UserForeign.GetInboxes(tgt)
+	if err != nil {
+		return nil, service.errDb("UndoLike", "get inboxes", err)
+	}
+	return inboxes, nil
 }

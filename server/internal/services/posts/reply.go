@@ -26,7 +26,7 @@ func (service *PostService) Reply(username, postID, vsb, content string, date ti
 	for service.db.Query.IsPostExist(id) {
 		id = utils.NewUUID()
 	}
-	url := utils.GeneratePostID(id, service.site)
+	url := utils.GeneratePostID(id, service.scheme, service.domain)
 
 	v, ok := utils.GetVsb(vsb)
 	if !ok {

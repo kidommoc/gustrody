@@ -107,18 +107,21 @@ func (client *Client) Do(req *http.Request, body []byte) (response *Response, er
 	}
 	res, err := client.client.Do(req)
 	if err != nil {
-		logger.Error("[Net] Failed to send request.", err)
+		msg := fmt.Sprintf("[Net] Failed to send request to %s.", req.URL)
+		logger.Error(msg, err)
 		return nil, err
 	}
 	if res.StatusCode > http.StatusBadRequest {
 		err := fmt.Errorf("status code: %d", res.StatusCode)
-		logger.Error("[Net] Response not ok.", err)
+		msg := fmt.Sprintf("[Net] Response not ok of request to %s.", req.URL)
+		logger.Error(msg, err)
 		return nil, err
 	}
 	resBody, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if err != nil {
-		logger.Error("[Net] Failed to read response body.", err)
+		msg := fmt.Sprintf("[Net] Failed to read response body of request to %s.", req.URL)
+		logger.Error(msg, err)
 		return nil, err
 	}
 	return &Response{

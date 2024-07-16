@@ -1,8 +1,10 @@
 package config
 
 type Config struct {
-	Debug   bool   `json:"debug"`
-	Site    string `json:"site"`
+	Debug bool `json:"debug"`
+
+	Scheme  string `json:"scheme"`
+	Domain  string `json:"domain"`
 	Port    int    `json:"port"`
 	HmacKey string `json:"hmacKey"`
 

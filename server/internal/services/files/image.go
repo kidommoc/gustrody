@@ -51,7 +51,7 @@ func (service *FileService) StoreImage(buf []byte) (url string, mediaType string
 		return "", "", ErrFsInternal
 	}
 
-	url = fmt.Sprintf("%s/imgs/%s.%s", service.site, img.Filename, img.Ext)
+	url = fmt.Sprintf("%s://%s/imgs/%s.%s", service.scheme, service.domain, img.Filename, img.Ext)
 	mediaType = "image/" + string(img.Ext)
 	return url, mediaType, nil
 }

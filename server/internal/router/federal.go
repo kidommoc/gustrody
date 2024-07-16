@@ -29,15 +29,10 @@ func webfinger(c *fiber.Ctx) error {
 		return c.SendString("Wrong resource.")
 	}
 	username := strings.TrimPrefix(acct, "acct:")
-	tmppts := strings.Split(username, "@")
-	if len(tmppts) < 2 {
-		c.Status(fiber.StatusBadRequest)
-		return c.SendString("Wrong resource.")
-	}
 
 	var federalService *federal.FederalService
 	services.Get(reflect.ValueOf(&federalService).Elem())
-	result, err := federalService.Webfinger(tmppts[0], strings.Join(tmppts[1:], ""))
+	result, err := federalService.Webfinger(username)
 	if err != nil {
 		switch err {
 		case federal.ErrNotFound:

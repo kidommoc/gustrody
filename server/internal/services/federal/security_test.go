@@ -10,7 +10,7 @@ import (
 )
 
 var seccfg = config.Config{
-	Site: "austrody.sns",
+	Domain: "austrody.sns",
 }
 
 func TestSignAndVerify(t *testing.T) {
@@ -19,7 +19,7 @@ func TestSignAndVerify(t *testing.T) {
 	dbs := FederalDbs{
 		UserAccount: mUAccDb,
 	}
-	service := NewService(nil, dbs, seccfg, logger)
+	service := NewService(nil, nil, dbs, seccfg, logger)
 
 	table := []struct {
 		u string
@@ -28,11 +28,11 @@ func TestSignAndVerify(t *testing.T) {
 	}{
 		{"u1", map[string]string{
 			"method": "get", "path": "/users/u1",
-			"host": seccfg.Site, "date": time.Now().Format(time.RFC822),
+			"host": seccfg.Domain, "date": time.Now().Format(time.RFC822),
 		}, ""},
 		{"u2", map[string]string{
 			"method": "post", "path": "/inbox",
-			"host": seccfg.Site, "date": time.Now().Add(-1 * time.Hour).Format(time.RFC822),
+			"host": seccfg.Domain, "date": time.Now().Add(-1 * time.Hour).Format(time.RFC822),
 		}, "foobar"},
 	}
 	for _, v := range table {

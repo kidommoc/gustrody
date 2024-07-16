@@ -7,13 +7,11 @@ import (
 	"github.com/kidommoc/gustrody/internal/router"
 	"github.com/kidommoc/gustrody/internal/services"
 
-	"fmt"
-
 	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
-	config.Get()
+	cfg := config.Get()
 	db.Init()
 	models.Init()
 	services.Init()
@@ -22,5 +20,11 @@ func main() {
 	router.Route(app)
 
 	// addr := fmt.Sprintf(":%d", cfg.Port)
-	fmt.Println(app.Listen(":8000"))
+	if cfg.Scheme == "http" {
+		panic(app.Listen(":8000"))
+	} else if cfg.Scheme == "https" {
+		// app.ListenTLS(":8000", certFile, keyFile)
+	} else {
+		panic("Failed to start server. Unknown scheme.")
+	}
 }

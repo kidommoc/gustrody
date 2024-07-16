@@ -33,15 +33,17 @@ type UserDbs struct {
 }
 
 type UserService struct {
-	lg   logging.Logger
-	site string
-	db   UserDbs
+	lg     logging.Logger
+	scheme string
+	domain string
+	db     UserDbs
 }
 
 func NewService(dbs UserDbs, cfg config.Config, lg logging.Logger) *UserService {
 	return &UserService{
-		lg:   lg,
-		site: cfg.Site,
-		db:   dbs,
+		lg:     lg,
+		scheme: cfg.Scheme,
+		domain: cfg.Domain,
+		db:     dbs,
 	}
 }

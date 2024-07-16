@@ -10,6 +10,7 @@ import (
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/models"
+	"github.com/kidommoc/gustrody/internal/services/files"
 	"github.com/kidommoc/gustrody/internal/services/net"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
@@ -27,22 +28,26 @@ type FederalDbs struct {
 
 type FederalService struct {
 	lg     logging.Logger
-	site   string
+	scheme string
+	domain string
 	net    *net.NetService
+	file   files.IFileService
 	db     FederalDbs
 	uidReg *regexp.Regexp
 	pidReg *regexp.Regexp
 }
 
-func NewService(net *net.NetService, dbs FederalDbs, cfg config.Config, lg logging.Logger) *FederalService {
-	uidReg := utils.UserIDReg(cfg.Site)
-	pidReg := utils.PostIDReg(cfg.Site)
+func NewService(net *net.NetService, file files.IFileService, dbs FederalDbs, cfg config.Config, lg logging.Logger) *FederalService {
+	uidReg := utils.UserIDReg(cfg.Scheme, cfg.Domain)
+	pidReg := utils.PostIDReg(cfg.Scheme, cfg.Domain)
 	if uidReg == nil || pidReg == nil {
 		panic("Failed to generate user or post id regexp.")
 	}
 	return &FederalService{
 		lg:     lg,
-		site:   cfg.Site,
+		scheme: cfg.Scheme,
+		domain: cfg.Domain,
+		file:   file,
 		net:    net,
 		db:     dbs,
 		uidReg: uidReg,
@@ -61,18 +66,22 @@ type WF struct {
 	Links   []WFLink `json:"links"`
 }
 
-func (service *FederalService) Webfinger(username, site string) (wf WF, err error) {
-	if site != service.site || !service.db.UserInfo.IsUserExist(username) {
+func (service *FederalService) Webfinger(username string) (wf WF, err error) {
+	ud := models.NewUD(username)
+	if ud.Username == "" {
+		return wf, ErrSyntax
+	}
+	if ud.Domain != service.domain || !service.db.UserInfo.IsUserExist(ud.Username) {
 		return wf, ErrNotFound
 	}
 
 	return WF{
-		Subject: fmt.Sprintf("acct:%s@%s", username, site),
+		Subject: fmt.Sprintf("acct:%s@%s", username, service.domain),
 		Links: []WFLink{
 			{
 				Rel:  "self",
 				Type: "application/activity+json",
-				Href: utils.GenerateUserID(username, service.site),
+				Href: utils.GenerateUserID(username, service.scheme, service.domain),
 			},
 		},
 	}, nil
@@ -109,8 +118,7 @@ func (service *FederalService) requestWebfinger(user models.UD) (url string, err
 		req.URL = u
 		res, err = client.Do(&req, nil)
 		if err != nil {
-			logger.Error("[Federal.reqWebfinger] Failed to send.", err)
-			return "", ErrRequest
+			return "", service.errReq("reqWebfinger", rawUrl, err)
 		}
 	}
 
@@ -146,4 +154,10 @@ func (service *FederalService) errDb(loc, dbAct string, err error) error {
 	msg := fmt.Sprintf("[Federal.%s] Failed to %s.", loc, dbAct)
 	service.lg.Error(msg, err)
 	return ErrDbInternal
+}
+
+func (service *FederalService) errReq(loc, dst string, err error) error {
+	msg := fmt.Sprintf("[Federal.%s] Failed to request %s.", loc, dst)
+	service.lg.Error(msg, err)
+	return ErrRequest
 }

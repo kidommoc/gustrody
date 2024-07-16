@@ -100,6 +100,6 @@ func Init() {
 			PostQuery: postModel, PostSet: postModel,
 			PostLike: postModel, PostShare: postModel,
 		}
-		services[fdt] = federal.NewService(np, dbs, cfg, lg)
+		services[fdt] = federal.NewService(np, fp, dbs, cfg, lg)
 	}
 }

@@ -49,7 +49,8 @@ type PostDbs struct {
 
 type PostService struct {
 	lg               logging.Logger
-	site             string
+	scheme           string
+	domain           string
 	maxContentLength int
 	maxImgInPost     int
 	db               PostDbs
@@ -59,7 +60,8 @@ type PostService struct {
 func NewService(us *users.UserService, dbs PostDbs, cfg config.Config, lg logging.Logger) *PostService {
 	return &PostService{
 		lg:               lg,
-		site:             cfg.Site,
+		scheme:           cfg.Scheme,
+		domain:           cfg.Domain,
 		maxContentLength: cfg.MaxContentLength,
 		maxImgInPost:     cfg.MaxImgInPost,
 		db:               dbs,

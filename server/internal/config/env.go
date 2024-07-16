@@ -23,9 +23,23 @@ func loadEnv() {
 		fmt.Println("Start in debug mode.")
 	}
 
-	site := envmap["SITE"]
+	// site scheme. http or https
+	scheme := envmap["SCHEME"]
+	switch scheme {
+	case "http":
+	case "https":
+	default:
+		scheme = "http"
+	}
+	config.Scheme = scheme
+
+	// site domain
+	domain := envmap["DOMAIN"]
 	// check site
-	config.Site = utils.TrimPath(site)
+	if !utils.DomainReg.MatchString(domain) {
+		panic("Your site is illegal!")
+	}
+	config.Domain = utils.TrimPath(domain)
 
 	// port. default 8000
 	port, err := strconv.Atoi(envmap["PORT"])

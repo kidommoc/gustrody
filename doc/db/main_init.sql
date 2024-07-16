@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS foreign_users (
   "avatar" text,
   "avatarUrl" text,
   "inbox" text NOT NULL,
-  "followers" text NOT NULL,
   "pub" text NOT NULL
 );
 

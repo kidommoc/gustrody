@@ -60,34 +60,34 @@ func NewUUID() string {
 }
 
 // format: https://domain.site/users/username
-func UserIDReg(site string) *regexp.Regexp {
-	if !DomainReg.MatchString(site) {
+func UserIDReg(scheme, domain string) *regexp.Regexp {
+	if !DomainReg.MatchString(domain) {
 		return nil
 	}
-	site = strings.ReplaceAll(site, `.`, `\.`)
-	literal := fmt.Sprintf(`https?://%s/users/(%s)`, site, LocalUsernameRegLiteral)
+	domain = strings.ReplaceAll(domain, `.`, `\.`)
+	literal := fmt.Sprintf(`%s://%s/users/(%s)`, scheme, domain, LocalUsernameRegLiteral)
 	return regexp.MustCompile(literal)
 }
 
-// format: https://domain.site/users/username
-func GenerateUserID(username, site string) string {
-	return fmt.Sprintf("https://%s/users/%s", site, username)
+// format: scheme://domain/users/username
+func GenerateUserID(username, scheme, domain string) string {
+	return fmt.Sprintf("%s://%s/users/%s", scheme, domain, username)
 }
 
 const UUIDRegLiteral = `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
 
-func PostIDReg(site string) *regexp.Regexp {
-	if !DomainReg.MatchString(site) {
+func PostIDReg(scheme, domain string) *regexp.Regexp {
+	if !DomainReg.MatchString(domain) {
 		return nil
 	}
-	site = strings.ReplaceAll(site, `.`, `\.`)
-	literal := fmt.Sprintf(`https?://%s/posts/(%s)`, site, UUIDRegLiteral)
+	domain = strings.ReplaceAll(domain, `.`, `\.`)
+	literal := fmt.Sprintf(`%s://%s/posts/(%s)`, scheme, domain, UUIDRegLiteral)
 	return regexp.MustCompile(literal)
 }
 
-// format: https://domain.site/posts/id
-func GeneratePostID(id, site string) string {
-	return fmt.Sprintf("https://%s/posts/%s", site, id)
+// format: scheme://domain/posts/id
+func GeneratePostID(id, scheme, domain string) string {
+	return fmt.Sprintf("%s://%s/posts/%s", scheme, domain, id)
 }
 
 // convert time.Time to RFC3339 string. format:
@@ -95,7 +95,7 @@ func GeneratePostID(id, site string) string {
 //	2006-01-02T15:04:05Z // timezone 0
 //	2006-01-02T15:04:05(+|-)07:00 // timezone +/-
 func DateString(d time.Time) string {
-	return d.Format(time.RFC3339)
+	return d.UTC().Format(time.RFC3339)
 }
 
 // convert RFC3339 string to time.Time. format:
@@ -104,6 +104,25 @@ func DateString(d time.Time) string {
 //	2006-01-02T15:04:05(+|-)07:00 // timezone +/-
 func ParseDateString(s string) *time.Time {
 	d, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return &d
+	} else {
+		return nil
+	}
+}
+
+// convert time.Time to RFC3339 string. format:
+//
+//	Mon, 02 Jan 2006 15:04:05 MST
+func HttpDateString(d time.Time) string {
+	return strings.ReplaceAll(d.UTC().Format(time.RFC1123), "UTC", "MST")
+}
+
+// convert RFC3339 string to time.Time. format:
+//
+//	Mon, 02 Jan 2006 15:04:05 MST
+func ParseHttpDateString(s string) *time.Time {
+	d, err := time.Parse(time.RFC1123, s)
 	if err != nil {
 		return &d
 	} else {

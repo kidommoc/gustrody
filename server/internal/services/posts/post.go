@@ -49,7 +49,7 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 		}
 		img := AttachImg{
 			Type: v.Type,
-			Url:  v.Url,
+			Url:  service.domain + v.Url,
 			Alt:  v.Alt,
 		}
 		ext := a[len(a)-1]
@@ -190,7 +190,7 @@ func (service *PostService) New(username, vsb, content string, date time.Time, a
 	for service.db.Query.IsPostExist(id) {
 		id = utils.NewUUID()
 	}
-	url := utils.GeneratePostID(id, service.site)
+	url := utils.GeneratePostID(id, service.scheme, service.domain)
 
 	imgs := []models.Img{}
 	for i, v := range attachments {

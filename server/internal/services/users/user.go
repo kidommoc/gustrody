@@ -24,10 +24,10 @@ func (service *UserService) GetInfo(username string) (info UserInfo, err error) 
 			logger.Error("[User] when GetInfo", e)
 			return info, ErrUserNotFound
 		}
-		info.ID = utils.GenerateUserID(u.Username.Username, service.site)
+		info.ID = utils.GenerateUserID(u.Username.Username, service.scheme, service.domain)
 		info.Username = u.Username.Username
 		info.Nickname = u.Nickname
-		// Avatar
+		info.Avatar = service.domain + u.Avatar.Url
 	}
 	return info, nil
 }
@@ -45,10 +45,10 @@ func (service *UserService) GetProfile(username string) (pf *UserProfile, err er
 		}
 		pf = &UserProfile{
 			UserInfo: UserInfo{
-				ID:       utils.GenerateUserID(u.Username.Username, service.site),
+				ID:       utils.GenerateUserID(u.Username.Username, service.scheme, service.domain),
 				Username: u.Username.Username,
 				Nickname: u.Nickname,
-				// Avatar
+				Avatar:   service.domain + u.Avatar.Url,
 			},
 			Summary: u.Summary,
 		}

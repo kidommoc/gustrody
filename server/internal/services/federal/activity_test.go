@@ -15,7 +15,8 @@ import (
 )
 
 var actcfg = config.Config{
-	Site: "127.0.0.1:7999",
+	Scheme: "http",
+	Domain: "127.0.0.1:7999",
 }
 
 var actTable = []struct {
@@ -28,7 +29,7 @@ var actTable = []struct {
 }
 
 func startActServer(t *testing.T, dbs FederalDbs) {
-	service := NewService(nil, dbs, actcfg, test.NewMockingLogger(t))
+	service := NewService(nil, nil, dbs, actcfg, test.NewMockingLogger(t))
 
 	app := fiber.New()
 
@@ -50,7 +51,7 @@ func startActServer(t *testing.T, dbs FederalDbs) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	app.Listen(actcfg.Site)
+	app.Listen(actcfg.Domain)
 }
 
 func TestSendActivity(t *testing.T) {
@@ -60,7 +61,7 @@ func TestSendActivity(t *testing.T) {
 		UserAccount: mUAccDb,
 	}
 	netService := net.NewNetService(logger)
-	service := NewService(netService, dbs, actcfg, logger)
+	service := NewService(netService, nil, dbs, actcfg, logger)
 
 	go startActServer(t, dbs)
 	time.Sleep(2 * time.Second) // wait for mocking foreign server starting
@@ -72,7 +73,7 @@ func TestSendActivity(t *testing.T) {
 			pub string
 			pri string
 		}{pub, pri}
-		dst := "http://" + actcfg.Site + v.p
+		dst := actcfg.Scheme + "://" + actcfg.Domain + v.p
 		err := service.sendActivity(v.u, []byte(v.b), []string{dst})
 		test.AssertNoError(t, err,
 			fmt.Sprintf("when %s sends to %s: ", v.u.String(), v.p)+"%v",

@@ -10,7 +10,7 @@ import (
 )
 
 var atcfg = config.Config{
-	Site: "account.test.sns",
+	Domain: "account.test.sns",
 }
 
 var us = []struct {

@@ -111,8 +111,10 @@ WHERE "username" = ${username};
 ## TABLE: foreign_users
 
 - username *PRIMARY, INDEX*: `text`
+- id: `text`
+- avatar: `text` as avatar local url
+- avatarUrl: `text` as avatar remote url
 - inbox: `text` as url
-- sharedInbox: `text` as url
 - pub: `text` as RSA public key
 
 ```sql
@@ -122,7 +124,6 @@ CREATE TABLE IF NOT EXISTS foreign_users (
   "avatar" text,
   "avatarUrl" text,
   "inbox" text NOT NULL,
-  "followers" text NOT NULL,
   "pub" text NOT NULL
 );
 ```
@@ -135,13 +136,12 @@ CREATE TABLE IF NOT EXISTS foreign_users (
 
 ```sql
 INSERT INTO foreign_users(
-  "user", "id", "avatar", "avatarUrl",
-  "pub", "inbox", "followers"
+  "user", "id", "avatar", "avatarUrl", "pub", "inbox"
 )
 VALUES (
-  ${username@domain}, ${userID},
-  ${avatarUrl}, ${avatarRemoteUrl},
-  ${public_key}, ${inbox_url}, ${followers_url}
+  ${username@domain}, ${user_id},
+  ${avatar_url}, ${avatarRemoteUrl},
+  ${public_key}, ${inbox_url}
 );
 
 CREATE INDEX foreign_id ON foreign_users ("id");
@@ -151,8 +151,7 @@ CREATE INDEX foreign_id ON foreign_users ("id");
 
 ```sql
 SELECT
-  "user", "id", "avatar", "avatarUrl",
-  "pub", "inbox", "followers"
+  "user", "id", "avatar", "avatarUrl", "pub", "inbox"
 FROM foreign_users
 WHERE "user" = ${username@domain};
 ```

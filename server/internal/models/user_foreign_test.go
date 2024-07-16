@@ -7,13 +7,13 @@ import (
 )
 
 var uftTable = []ForeignUser{
-	{Username: UD{"aaa", "exam.ple"}, ID: "idOfAaa", Avatar: "51b8b50a9a.png", AvtUrl: "51b8b50a9a.png", Inbox: "exam.ple/inbox", Followers: "idOfAaa/followers"},
-	{Username: UD{"bbb", "exam.ple"}, ID: "idOfBbb", Avatar: "f55cf38f49.png", AvtUrl: "f55cf38f49.png", Inbox: "exam.ple/inbox", Followers: "idOfBbb/followers"},
-	{Username: UD{"ccc", "site.sns"}, ID: "idOfCcc", Avatar: "a2af90f964.png", AvtUrl: "a2af90f964.png", Inbox: "site.sns/inbox", Followers: "idOfCcc/followers"},
+	{Username: UD{"aaa", "exam.ple"}, ID: "idOfAaa", Avatar: "51b8b50a9a.png", AvtUrl: "51b8b50a9a.png", Inbox: "exam.ple/inbox"},
+	{Username: UD{"bbb", "exam.ple"}, ID: "idOfBbb", Avatar: "f55cf38f49.png", AvtUrl: "f55cf38f49.png", Inbox: "exam.ple/inbox"},
+	{Username: UD{"ccc", "site.sns"}, ID: "idOfCcc", Avatar: "a2af90f964.png", AvtUrl: "a2af90f964.png", Inbox: "site.sns/inbox"},
 }
 
 var uftInput = ForeignUser{
-	Username: UD{"aaa", "exam.ple"}, ID: "idOfAaa", Avatar: "ee483a3654.png", AvtUrl: "ee483a3654.png", Inbox: "exam.ple/inbox", Followers: "exam.ple/Aaa/followers",
+	Username: UD{"aaa", "exam.ple"}, ID: "idOfAaa", Avatar: "ee483a3654.png", AvtUrl: "ee483a3654.png", Inbox: "exam.ple/inbox",
 }
 
 var uftTableI = []struct {

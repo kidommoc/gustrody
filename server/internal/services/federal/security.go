@@ -17,7 +17,7 @@ import (
 func (service *FederalService) Sign(username string, header map[string]string) (result string, err error) {
 	logger := service.lg
 
-	keyId := utils.GenerateUserID(username, service.site) + "#main-key"
+	keyId := utils.GenerateUserID(username, service.scheme, service.domain) + "#main-key"
 	headers := "(request-target) host date"
 	ns := strings.Split(headers, " ")
 	for i, v := range ns {
@@ -125,32 +125,13 @@ func (service *FederalService) Verify(header map[string]string, body []byte) boo
 	}
 	compare := strings.Join(ns, "\n")
 
-	/* actural code
 	uid := strings.Split(keyId, "#")[0]
-	user, err := service.GetForeignUserByID(uid)
+	user, _, err := service.GetForeignUserByID(uid)
 	if err != nil {
 		logger.Error("[Federal.Verify] Failed to get Foreign user.", err)
 		return false
 	}
-	pub := utils.GetPublicKey(user.PubKey)
-	*/
-
-	// start temp test code
-	reg = regexp.MustCompile(utils.GenerateUserID(fmt.Sprintf(
-		"(%s)#main-key", utils.UsernameRegLiteral,
-	), service.site))
-	match := reg.FindStringSubmatch(keyId)
-	if len(match) < 2 {
-		logger.Error("failed to parse keyId", nil)
-		return false
-	}
-	pub, _, err := service.db.UserAccount.QueryUserKeys(match[1])
-	if err != nil {
-		logger.Error("failed to query user keys", err)
-		return false
-	}
-	pubK := utils.GetPublicKey(pub)
-	// end temp test code
+	pubK := utils.GetPublicKey(user.PubKey)
 
 	if pubK == nil {
 		logger.Error("[Federal.Verify] Failed to convert pem to public key.", nil)
