@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	_db "github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
@@ -124,17 +124,19 @@ func (p *Preferences) Scan(src interface{}) error {
 // db
 
 type UserDb struct {
-	lg   logging.Logger
-	pool _db.ConnPool[_db.PqConn]
+	lg     logging.Logger
+	client *sql.DB
+	cache  *CacheDb
 }
 
 var userIns *UserDb = nil
 
-func UserInstance(lg logging.Logger) *UserDb {
+func UserInstance(lg logging.Logger, cl *sql.DB, cache *CacheDb) *UserDb {
 	if userIns == nil {
 		userIns = &UserDb{
-			lg:   lg,
-			pool: _db.MainPool(nil),
+			lg:     lg,
+			client: cl,
+			cache:  cache,
 		}
 	}
 	return userIns

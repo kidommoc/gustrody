@@ -15,19 +15,12 @@ type IUserAccount interface {
 
 func (db *UserDb) SetUser(user *User) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserAccount] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` INSERT INTO users("username", "nickname", "summary", "createdAt", "avatar", "keys")
 			VALUES ($1, $2, '', $3, '', $4);`
-	r, err := conn.Exec(qs,
+	r, err := sqlExec(db.client.Exec(qs,
 		user.Username, user.Nickname,
 		time.Now().UTC(), user.Keys,
-	)
+	))
 	if err != nil {
 		logger.Error("[Model.UserAccount] Failed to execute", err)
 		return ErrDbInternal
@@ -40,17 +33,10 @@ func (db *UserDb) SetUser(user *User) error {
 
 func (db *UserDb) QueryUserKeys(username string) (pub string, pri string, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserAccount] Failed to open a connection", err)
-		return "", "", ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT "keys"
 			FROM users
 			WHERE "username" = $1;`
-	r := conn.QueryOne(qs, username)
+	r := db.client.QueryRow(qs, username)
 	var kp KeyPair
 	if e := r.Scan(&kp); e != nil {
 		logger.Error("[Model.UserAccount] Cannot scan row", e)
@@ -61,17 +47,10 @@ func (db *UserDb) QueryUserKeys(username string) (pub string, pri string, err er
 
 func (db *UserDb) QueryUserPreferences(username string) (pf *Preferences, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserAccount] Failed to open a connection", err)
-		return nil, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT "preferences"
 			FROM users
 			WHERE "username" = $1;`
-	r := conn.QueryOne(qs, username)
+	r := db.client.QueryRow(qs, username)
 	if err := r.Scan(&pf); err != nil {
 		switch err {
 		case sql.ErrNoRows:
@@ -86,23 +65,16 @@ func (db *UserDb) QueryUserPreferences(username string) (pf *Preferences, err er
 
 func (db *UserDb) UpdateUserPreferences(username string, pf *Preferences) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserAccount] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` UPDATE users
 			SET "preferences" = $2
 			WHERE "username" = $1;`
-	r, err := conn.Exec(qs, username, *pf)
+	r, err := sqlExec(db.client.Exec(qs, username, *pf))
 	if err != nil {
 		logger.Error("[Model.UserAccount] Failed to execute", err)
 		return ErrDbInternal
 	}
 	if r == 0 {
-		return ErrNotFound
+		return ErrDunplicate
 	}
 	return nil
 }

@@ -4,16 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/test"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
-
-var postcfg = config.Config{
-	PqUser:   "penguin",
-	PqSecret: "postgres",
-	RdSecret: "redis",
-}
 
 type pqstInput struct {
 	Post
@@ -57,13 +50,13 @@ func TestPostSetAndQuery(t *testing.T) {
 	d := time.Now().UTC()
 
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	postDb := &PostDb{lg: logger, pool: mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	postDb := &PostDb{logger, client, nil}
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
-			conn, _ := mp.Open()
-			defer conn.Close()
-			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 
@@ -88,13 +81,13 @@ func TestPostUpdate(t *testing.T) {
 	d1 := d.Add(time.Hour)
 
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	postDb := &PostDb{lg: logger, pool: mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	postDb := &PostDb{logger, client, nil}
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
-			conn, _ := mp.Open()
-			defer conn.Close()
-			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 
@@ -123,13 +116,13 @@ func TestPostRemove(t *testing.T) {
 	d := time.Now().UTC()
 
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	postDb := &PostDb{lg: logger, pool: mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	postDb := &PostDb{logger, client, nil}
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
-			conn, _ := mp.Open()
-			defer conn.Close()
-			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 

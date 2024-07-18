@@ -38,13 +38,13 @@ var uatTablePf = []Preferences{
 
 func TestUserSetAndQuery(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	userDb := &UserDb{logger, mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	userDb := &UserDb{logger, client, nil}
 	t.Cleanup(func() {
 		for _, v := range uatTableU {
-			conn, _ := mp.Open()
-			defer conn.Close()
-			conn.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
+			client.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
 		}
 	})
 
@@ -69,13 +69,13 @@ func TestUserSetAndQuery(t *testing.T) {
 
 func TestUserUpdate(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	userDb := &UserDb{logger, mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	userDb := &UserDb{logger, client, nil}
 	t.Cleanup(func() {
 		for _, v := range uatTableU {
-			conn, _ := mp.Open()
-			defer conn.Close()
-			conn.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
+			client.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
 		}
 	})
 
@@ -98,13 +98,13 @@ func TestUserUpdate(t *testing.T) {
 
 func TestPreferenceUpdate(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	userDb := &UserDb{logger, mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	userDb := &UserDb{logger, client, nil}
 	t.Cleanup(func() {
 		for _, v := range uatTableU {
-			conn, _ := mp.Open()
-			defer conn.Close()
-			conn.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
+			client.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
 		}
 	})
 

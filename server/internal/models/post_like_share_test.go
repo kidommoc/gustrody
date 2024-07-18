@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/test"
 	"github.com/kidommoc/gustrody/internal/utils"
@@ -32,13 +31,13 @@ var plstTable = []struct {
 
 func TestLike(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	postDb := &PostDb{lg: logger, pool: mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	postDb := &PostDb{logger, client, nil}
 	t.Cleanup(func() {
-		conn, _ := mp.Open()
-		defer conn.Close()
 		for _, v := range pqstTable {
-			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
 
@@ -79,11 +78,11 @@ func TestLike(t *testing.T) {
 	})
 }
 
-func checkShare(conn db.PqConn, lg logging.Logger, user, id string) bool {
+func checkShare(client *sql.DB, lg logging.Logger, user, id string) bool {
 	qs := `SELECT 1
 		   FROM shares
 		   WHERE "user" = $1 AND "id" = $2;`
-	r := conn.QueryOne(qs, user, id)
+	r := client.QueryRow(qs, user, id)
 	var n int
 	if e := r.Scan(&n); e != nil {
 		switch e {
@@ -99,20 +98,18 @@ func checkShare(conn db.PqConn, lg logging.Logger, user, id string) bool {
 
 func TestShare(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	postDb := &PostDb{lg: logger, pool: mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	postDb := &PostDb{logger, client, nil}
 	t.Cleanup(func() {
-		conn, _ := mp.Open()
-		defer conn.Close()
 		for _, v := range plstTable {
-			conn.Exec(`DELETE FROM shares WHERE "user" = $1 AND "id" = $2;`, v.input.actor, v.input.target)
+			client.Exec(`DELETE FROM shares WHERE "user" = $1 AND "id" = $2;`, v.input.actor, v.input.target)
 		}
 		for _, v := range pqstTable {
-			conn.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
 		}
 	})
-	conn, _ := mp.Open()
-	defer conn.Close()
 	d := time.Now()
 
 	inputP := pqstTable[0].input
@@ -127,7 +124,7 @@ func TestShare(t *testing.T) {
 		got, err := postDb.QueryShares(input.target)
 		test.AssertNoError(t, err, "Error when query(1): %+v")
 		test.AssertEqual(t, want, got)
-		test.AssertEqual(t, true, checkShare(conn, logger, input.actor.String(), input.target))
+		test.AssertEqual(t, true, checkShare(client, logger, input.actor.String(), input.target))
 	})
 
 	t.Run("Share 2", func(t *testing.T) {
@@ -139,7 +136,7 @@ func TestShare(t *testing.T) {
 		got, err := postDb.QueryShares(input.target)
 		test.AssertNoError(t, err, "Error when query(2): %+v")
 		test.AssertEqual(t, want, got)
-		test.AssertEqual(t, true, checkShare(conn, logger, input.actor.String(), input.target))
+		test.AssertEqual(t, true, checkShare(client, logger, input.actor.String(), input.target))
 	})
 
 	t.Run("Remove share 2", func(t *testing.T) {
@@ -151,6 +148,6 @@ func TestShare(t *testing.T) {
 		got, err := postDb.QueryShares(input.target)
 		test.AssertNoError(t, err, "Error when query(3): %+v")
 		test.AssertEqual(t, want, got)
-		test.AssertEqual(t, false, checkShare(conn, logger, input.actor.String(), input.target))
+		test.AssertEqual(t, false, checkShare(client, logger, input.actor.String(), input.target))
 	})
 }

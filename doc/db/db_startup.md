@@ -43,3 +43,13 @@ $ docker build -f redis.dockerfile -t austrodb-auth:1.0 \
 $ docker run -d --name austordb-auth -p 6739:6739 \
 > --network austrodb-redis austrodb-auth:1.0
 ```
+
+```sh
+# pwd: gustrody/db
+$ docker build -f redis.dockerfile -t austrodb-cache:1.0 \
+> --secret id=redis,src=./redis_secret \
+> --build-arg DB=cache .
+
+$ docker run -d --name austordb-cache -p 6738:6739 \
+> --network austrodb-redis austrodb-cache:1.0
+```

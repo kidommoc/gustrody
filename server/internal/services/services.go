@@ -47,9 +47,11 @@ func Get(v reflect.Value) error {
 func Init() {
 	cfg := config.Get()
 	lg := logging.Get()
-	authModel := models.AuthInstance(lg)
-	userModel := models.UserInstance(lg)
-	postModel := models.PostInstance(lg)
+	// models should be initialized yet
+	// here directly get the instance
+	authModel := models.AuthInstance(nil, nil)
+	userModel := models.UserInstance(nil, nil, nil)
+	postModel := models.PostInstance(nil, nil, nil)
 
 	var ap *auth.OauthService
 	at := reflect.TypeOf(ap)

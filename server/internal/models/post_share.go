@@ -20,17 +20,10 @@ type IPostShare interface {
 //   - NotFound "post"
 func (db *PostDb) QueryShares(id string) (list []UD, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Share] Failed to open a connection", err)
-		return nil, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT "shares"
 			FROM posts
 			WHERE "id" = $1;`
-	r := conn.QueryOne(qs, id)
+	r := db.client.QueryRow(qs, id)
 
 	e := r.Scan(pq.Array(&list))
 	if e != nil {
@@ -52,17 +45,11 @@ func (db *PostDb) QueryShares(id string) (list []UD, err error) {
 //   - Dunplicate "share"
 func (db *PostDb) SetShare(user UD, id string, date time.Time, vsb utils.Vsb) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Share] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
 	if !db.IsPostExist(id) {
 		return ErrNotFound
 	}
 
-	tx, e := conn.BeginTx()
+	tx, e := db.client.Begin()
 	if e != nil {
 		logger.Error("[Model.Share] Cannot start transaction", e)
 		return ErrDbInternal
@@ -72,7 +59,7 @@ func (db *PostDb) SetShare(user UD, id string, date time.Time, vsb utils.Vsb) er
 	qs := ` UPDATE posts
 			SET "shares" = ARRAY_APPEND("shares", $1)
 			WHERE "id" = $2 AND ARRAY_POSITION("shares", $1) IS NULL;`
-	r, e := tx.Exec(qs, user, id)
+	r, e := sqlExec(tx.Exec(qs, user, id))
 	if e != nil {
 		logger.Error("[Model.Share] Failed to execute", e)
 		return ErrDbInternal
@@ -84,7 +71,7 @@ func (db *PostDb) SetShare(user UD, id string, date time.Time, vsb utils.Vsb) er
 	// insert into shares
 	qs = `  INSERT INTO shares("user", "id", "date", "vsb")
 			VALUES ($1, $2, $3, $4);`
-	_, e = tx.Exec(qs, user, id, date, vsb.String())
+	r, e = sqlExec(tx.Exec(qs, user, id, date, vsb.String()))
 	if e != nil {
 		logger.Error("[Model.Share] Failed to execute", e)
 		return ErrDbInternal
@@ -106,17 +93,11 @@ func (db *PostDb) SetShare(user UD, id string, date time.Time, vsb utils.Vsb) er
 //   - NotFound "post", "share"
 func (db *PostDb) RemoveShare(user UD, id string) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Share] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
 	if !db.IsPostExist(id) {
 		return ErrNotFound
 	}
 
-	tx, e := conn.BeginTx()
+	tx, e := db.client.Begin()
 	if e != nil {
 		logger.Error("[Model.Share] Cannot start transaction", e)
 		return ErrDbInternal
@@ -128,7 +109,7 @@ func (db *PostDb) RemoveShare(user UD, id string) error {
 		qs := ` UPDATE posts
 				SET "shares" = ARRAY_REMOVE("shares", $1)
 				WHERE "id" = $2;`
-		r, e := tx.Exec(qs, user, id)
+		r, e := sqlExec(tx.Exec(qs, user, id))
 		if e != nil {
 			logger.Error("[Model.Share] Failed to exec", e)
 			return ErrDbInternal
@@ -142,7 +123,7 @@ func (db *PostDb) RemoveShare(user UD, id string) error {
 	err2 := func() error {
 		qs := ` DELETE FROM shares
 				WHERE "user" = $1 AND "id" = $2;`
-		r, e := tx.Exec(qs, user, id)
+		r, e := sqlExec(tx.Exec(qs, user, id))
 		if e != nil {
 			logger.Error("[Model.Share] Failed to exec", e)
 			return ErrDbInternal

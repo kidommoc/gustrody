@@ -30,15 +30,8 @@ type ForeignUser struct {
 
 func (db *UserDb) IsForeignExist(username UD) bool {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserForeign] Failed to open a connection", err)
-		return false
-	}
-	defer conn.Close()
-
 	qs := `SELECT 1 FROM foreign_users WHERE "user" = $1;`
-	r := conn.QueryOne(qs, username)
+	r := db.client.QueryRow(qs, username)
 	var n int
 	if err := r.Scan(&n); err != nil {
 		switch err {
@@ -53,17 +46,10 @@ func (db *UserDb) IsForeignExist(username UD) bool {
 
 func (db *UserDb) GetForeignUserByUD(username UD) (user ForeignUser, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserForeign] Failed to open a connection", err)
-		return user, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
 			FROM foreign_users
 			WHERE "user" = $1;`
-	r := conn.QueryOne(qs, username)
+	r := db.client.QueryRow(qs, username)
 	if err := r.Scan(
 		&user.Username, &user.ID, &user.Avatar, &user.AvtUrl,
 		&user.PubKey, &user.Inbox,
@@ -80,17 +66,10 @@ func (db *UserDb) GetForeignUserByUD(username UD) (user ForeignUser, err error) 
 
 func (db *UserDb) GetForeignUserByID(id string) (user ForeignUser, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserForeign] Failed to open a connection", err)
-		return user, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT "user", "id", "avatar", "avatarUrl", "pub", "inbox"
 			FROM foreign_users
 			WHERE "id" = $1;`
-	r := conn.QueryOne(qs, id)
+	r := db.client.QueryRow(qs, id)
 	if err := r.Scan(
 		&user.Username, &user.ID,
 		&user.Avatar, &user.AvtUrl,
@@ -108,22 +87,16 @@ func (db *UserDb) GetForeignUserByID(id string) (user ForeignUser, err error) {
 
 func (db *UserDb) SetForeignUser(user *ForeignUser) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserForeign] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
-
+	var err error
 	if db.IsForeignExist(user.Username) {
 		qs := ` UPDATE foreign_users
 				SET "avatar" = $2, "avatarUrl" = $3, "pub" = $4, "inbox" = $5
 				WHERE "id" = $1;`
-		_, err = conn.Exec(qs, user.ID, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox)
+		_, err = db.client.Exec(qs, user.ID, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox)
 	} else {
 		qs := ` INSERT INTO foreign_users("user", "id", "avatar", "avatarUrl", "pub", "inbox")
 				VALUES ($1, $2, $3, $4, $5, $6);`
-		_, err = conn.Exec(qs, user.Username, user.ID, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox)
+		_, err = db.client.Exec(qs, user.Username, user.ID, user.Avatar, user.AvtUrl, user.PubKey, user.Inbox)
 	}
 	if err != nil {
 		logger.Error("[Model.UserForeign] Failed to execute set", err)
@@ -134,17 +107,10 @@ func (db *UserDb) SetForeignUser(user *ForeignUser) error {
 
 func (db *UserDb) GetInboxes(usernames []UD) (inboxes []string, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.UserForeign] Failed to open a connection", err)
-		return nil, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT DISTINCT "inbox"
 			FROM foreign_users
 			WHERE "user" = ANY($1);`
-	r, err := conn.Query(qs, pq.Array(usernames))
+	r, err := db.client.Query(qs, pq.Array(usernames))
 	if err != nil {
 		logger.Error("[Model.UserForeign] Cannot query inboxes.", err)
 	}

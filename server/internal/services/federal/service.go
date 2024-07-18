@@ -90,6 +90,7 @@ func (service *FederalService) Webfinger(username string) (wf WF, err error) {
 func (service *FederalService) requestWebfinger(user models.UD) (url string, err error) {
 	logger := service.lg
 	client := service.net.HttpClient()
+	defer client.Close()
 
 	// try http
 	rawUrl := fmt.Sprintf("http://%s/.well-known/webfinger/?resource=acct:%s",

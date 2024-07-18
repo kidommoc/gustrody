@@ -11,15 +11,9 @@ type IUserInfo interface {
 
 func (db *UserDb) IsUserExist(username string) bool {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
-		return false
-	}
-	defer conn.Close()
 
 	qs := `SELECT 1 FROM users WHERE "username" = $1;`
-	r := conn.QueryOne(qs, username)
+	r := db.client.QueryRow(qs, username)
 	var n int
 	if err := r.Scan(&n); err != nil { // can't understand why i MUST scan to check whether result is empty. silly design
 		switch err {
@@ -38,17 +32,11 @@ func (db *UserDb) IsUserExist(username string) bool {
 //   - NotFound "user"
 func (db *UserDb) QueryUser(username string) (user User, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
-		return user, ErrDbInternal
-	}
-	defer conn.Close()
 
 	qs := ` SELECT "username", "nickname", "summary", "createdAt"
 			FROM users
 			WHERE "username" = $1;`
-	r := conn.QueryOne(qs, username)
+	r := db.client.QueryRow(qs, username)
 	var nkn sql.NullString
 	var smy sql.NullString
 	if e := r.Scan(
@@ -73,19 +61,12 @@ func (db *UserDb) QueryUser(username string) (user User, err error) {
 
 func (db *UserDb) UpdateUser(user *User) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` UPDATE users
 			SET "nickname" = $2, "summary" = $3, "avatar" = $4
 			WHERE "username" = $1;`
-	r, err := conn.Exec(qs, user.Username.Username,
+	r, err := sqlExec(db.client.Exec(qs, user.Username.Username,
 		user.Nickname, user.Summary, user.Avatar,
-	)
+	))
 	if err != nil {
 		logger.Error("[Model.UserInfo] Failed to execute", err)
 		return ErrDbInternal

@@ -18,17 +18,10 @@ type IPostLike interface {
 //   - NotFound "post"
 func (db *PostDb) QueryLikes(id string) (list []UD, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.PostLike] Failed to open a connection", err)
-		return nil, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT "likes"
 			FROM posts
 			WHERE "id" = $1;`
-	r := conn.QueryOne(qs, id)
+	r := db.client.QueryRow(qs, id)
 
 	e := r.Scan(pq.Array(&list))
 	if e != nil {
@@ -50,12 +43,6 @@ func (db *PostDb) QueryLikes(id string) (list []UD, err error) {
 //   - Dunplicate "like"
 func (db *PostDb) SetLike(user UD, id string) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.PostLike] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
 	if !db.IsPostExist(id) {
 		return ErrNotFound
 	}
@@ -65,7 +52,7 @@ func (db *PostDb) SetLike(user UD, id string) error {
 			WHERE
 			  "id" = $2
   			  AND ARRAY_POSITION("likes", $1) IS NULL;`
-	r, e := conn.Exec(qs, user, id)
+	r, e := sqlExec(db.client.Exec(qs, user, id))
 	if e != nil {
 		logger.Error("[Model.PostLike] Failed to execute", e)
 		return ErrDbInternal
@@ -82,17 +69,10 @@ func (db *PostDb) SetLike(user UD, id string) error {
 //   - NotFound "post"
 func (db *PostDb) RemoveLike(user UD, id string) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.PostLike] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` UPDATE posts
 			SET "likes" = ARRAY_REMOVE("likes", $1)
 			WHERE "id" = $2;`
-	r, e := conn.Exec(qs, user, id)
+	r, e := sqlExec(db.client.Exec(qs, user, id))
 	if e != nil {
 		logger.Error("[Model.PostLike] Failed to execute", e)
 		return ErrDbInternal

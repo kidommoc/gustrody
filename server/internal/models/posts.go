@@ -1,12 +1,12 @@
 package models
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"strings"
 	"time"
 
-	_db "github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
@@ -72,17 +72,19 @@ type Post struct {
 // db
 
 type PostDb struct {
-	lg   logging.Logger
-	pool _db.ConnPool[_db.PqConn]
+	lg     logging.Logger
+	client *sql.DB
+	cache  *CacheDb
 }
 
 var postIns *PostDb = nil
 
-func PostInstance(lg logging.Logger) *PostDb {
+func PostInstance(lg logging.Logger, cl *sql.DB, cache *CacheDb) *PostDb {
 	if postIns == nil {
 		postIns = &PostDb{
-			lg:   lg,
-			pool: _db.MainPool(nil),
+			lg:     lg,
+			client: cl,
+			cache:  cache,
 		}
 	}
 	return postIns

@@ -33,13 +33,13 @@ var uftTableI = []struct {
 
 func TestForeignUserSetAndQuery(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	userDb := &UserDb{logger, mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	userDb := &UserDb{logger, client, nil}
 	t.Cleanup(func() {
-		conn, _ := mp.Open()
-		defer conn.Close()
 		for _, v := range uftTable {
-			conn.Exec(`DELETE FROM foreign_users WHERE "user" = $1;`, v.Username)
+			client.Exec(`DELETE FROM foreign_users WHERE "user" = $1;`, v.Username)
 		}
 	})
 
@@ -64,13 +64,13 @@ func TestForeignUserSetAndQuery(t *testing.T) {
 
 func TestForeignUserUpdate(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	userDb := &UserDb{logger, mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	userDb := &UserDb{logger, client, nil}
 	t.Cleanup(func() {
-		conn, _ := mp.Open()
-		defer conn.Close()
 		for _, v := range uftTable {
-			conn.Exec(`DELETE FROM foreign_users WHERE "user" = $1;`, v.Username)
+			client.Exec(`DELETE FROM foreign_users WHERE "user" = $1;`, v.Username)
 		}
 	})
 
@@ -93,13 +93,13 @@ func TestForeignUserUpdate(t *testing.T) {
 
 func TestForeignInboxGet(t *testing.T) {
 	logger := test.NewMockingLogger(t)
-	mp := newMockingPqPool(postcfg, logger)
-	userDb := &UserDb{logger, mp}
+	client := initMainDb(modelscfg, logger, pqOpt{
+		Addr: "localhost:5432", MaxConn: 5,
+	})
+	userDb := &UserDb{logger, client, nil}
 	t.Cleanup(func() {
-		conn, _ := mp.Open()
-		defer conn.Close()
 		for _, v := range uftTable {
-			conn.Exec(`DELETE FROM foreign_users WHERE "user" = $1;`, v.Username)
+			client.Exec(`DELETE FROM foreign_users WHERE "user" = $1;`, v.Username)
 		}
 	})
 

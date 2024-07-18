@@ -22,15 +22,8 @@ type IPostSet interface {
 
 func (db *PostDb) IsPostExist(id string) bool {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return false
-	}
-	defer conn.Close()
-
 	qs := `SELECT 1 FROM posts WHERE "id" = $1;`
-	r := conn.QueryOne(qs, id)
+	r := db.client.QueryRow(qs, id)
 	var n int
 	if err := r.Scan(&n); err != nil {
 		switch err {
@@ -49,19 +42,12 @@ func (db *PostDb) IsPostExist(id string) bool {
 //   - NotFound "post"
 func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return post, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` SELECT
 			  "id", "url", "user", "date", "vsb", "content", "media",
 			  CARDINALITY("likes") as "likes", CARDINALITY("shares") as "shares"
 			FROM posts
 			WHERE "id" = $1;`
-	r := conn.QueryOne(qs, id)
+	r := db.client.QueryRow(qs, id)
 
 	post = Post{}
 	var vsb string
@@ -88,12 +74,6 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
 //   - NotFound "post"
 func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Post, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return nil, nil, ErrDbInternal
-	}
-	defer conn.Close()
 	if !db.IsPostExist(id) {
 		return nil, nil, ErrNotFound
 	}
@@ -112,7 +92,7 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 			  posts."replying", rt."level"
 			FROM posts JOIN rt ON posts."id" = rt."id"
 			ORDER BY "level" ASC, "date" DESC;`
-	r, e := conn.Query(qs, id)
+	r, e := db.client.Query(qs, id)
 	if e != nil {
 		logger.Error("[Model.Posts] Cannot query", e)
 		return nil, nil, ErrDbInternal
@@ -153,7 +133,7 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 			  posts."replying", rs."level"
 			FROM posts JOIN rs ON posts."id" = rs."id"
 			ORDER BY "level" ASC, "date" DESC;`
-	r, e = conn.Query(qs, id)
+	r, e = db.client.Query(qs, id)
 	if e != nil {
 		logger.Error("[Model.Posts] Cannot query", e)
 		return nil, nil, ErrDbInternal
@@ -187,13 +167,6 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 //   - DbInternal
 func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return nil, ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := `   WITH rr AS (
 			    SELECT p1."id", p2."user" as "user"
 			    FROM posts AS p1, posts AS p2
@@ -227,7 +200,7 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 	} else {
 		qs = fmt.Sprintf(qs, "DESC")
 	}
-	r, e := conn.Query(qs, user)
+	r, e := db.client.Query(qs, user)
 	if e != nil {
 		logger.Error("[Model.Posts] Cannot query", e)
 		return nil, ErrDbInternal
@@ -265,12 +238,6 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 //   - Dunplicate "post"
 func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
 	if p.Replying != "" && !db.IsPostExist(p.Replying) {
 		return ErrNotFound
 	}
@@ -278,11 +245,11 @@ func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 	qs := ` INSERT INTO posts("id", "url", "user", "date", "replying", "vsb", "content", "media")
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`
 	p.Date = p.Date.UTC()
-	r, e := conn.Exec(qs,
+	r, e := sqlExec(db.client.Exec(qs,
 		p.ID, p.Url, p.User, p.Date,
 		p.Replying, p.Vsb.String(), p.Content,
 		NewArray(attachments).ValueArray(),
-	)
+	))
 	if e != nil {
 		logger.Error("[Model.Posts] Failed to execute", e)
 		return ErrDbInternal
@@ -299,18 +266,11 @@ func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 //   - NotFound "post"
 func (db *PostDb) UpdatePost(p *Post, attachments []Img) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
-
 	qs := ` UPDATE posts
 			SET "date" = $2, "content" = $3, "media" = $4
 			WHERE "id" = $1;`
 	p.Date = p.Date.UTC()
-	r, e := conn.Exec(qs, p.ID, p.Date, p.Content, NewArray(attachments).ValueArray())
+	r, e := sqlExec(db.client.Exec(qs, p.ID, p.Date, p.Content, NewArray(attachments).ValueArray()))
 	if e != nil {
 		logger.Error("[Model.Posts] Failed to execute", e)
 		return ErrDbInternal
@@ -327,19 +287,13 @@ func (db *PostDb) UpdatePost(p *Post, attachments []Img) error {
 //   - NotFound "post"
 func (db *PostDb) RemovePost(id string) error {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Posts] Failed to open a connection", err)
-		return ErrDbInternal
-	}
-	defer conn.Close()
 	if !db.IsPostExist(id) {
 		return ErrNotFound
 	}
 
 	qs := ` DELETE FROM posts
 			WHERE "id" = $1;`
-	r, e := conn.Exec(qs, id)
+	r, e := sqlExec(db.client.Exec(qs, id))
 	if e != nil {
 		logger.Error("[Model.Posts] Failed to execute", e)
 		return ErrDbInternal

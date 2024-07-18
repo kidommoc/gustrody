@@ -5,6 +5,7 @@ import (
 
 	_db "github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/logging"
+	"github.com/redis/go-redis/v9"
 )
 
 type IAuthDb interface {
@@ -13,17 +14,17 @@ type IAuthDb interface {
 }
 
 type AuthDb struct {
-	lg   logging.Logger
-	pool _db.ConnPool[_db.RdConn]
+	lg     logging.Logger
+	client *redis.Client
 }
 
 var authIns *AuthDb = nil
 
-func AuthInstance(lg logging.Logger) *AuthDb {
+func AuthInstance(lg logging.Logger, cl *redis.Client) *AuthDb {
 	if authIns == nil {
 		authIns = &AuthDb{
-			lg:   lg,
-			pool: _db.AuthPool(nil),
+			lg:     lg,
+			client: cl,
 		}
 	}
 	return authIns
@@ -38,14 +39,8 @@ func AuthInstance(lg logging.Logger) *AuthDb {
 //   - Syntax "empty password"
 func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err error) {
 	logger := db.lg
-	conn, err := db.pool.Open()
-	if err != nil {
-		logger.Error("[Model.Auth] Failed to open a connection", err)
-		return "", ErrDbInternal
-	}
-	defer conn.Close()
 
-	passwd, err := conn.Get("pswd:" + username)
+	passwd, err := db.client.Get(defaultCtx, "pswd:"+username).Result()
 	if err != nil {
 		switch err {
 		case _db.ErrNotFound:
@@ -71,17 +66,10 @@ func (db *AuthDb) SetUserPassword(username, password string) error {
 	if password == "" {
 		return ErrSyntax
 	}
-
 	logger := db.lg
-	conn, e := db.pool.Open()
-	if e != nil {
-		logger.Error("[Model.Auth] Failed to open a connection", e)
-		return ErrDbInternal
-	}
-	defer conn.Close()
 
-	if e := conn.SetString("pswd:"+username, password); e != nil {
-		logger.Error("[Model.Auth] Cannot set password", e)
+	if _, err := db.client.Set(defaultCtx, "pswd:"+username, password, 0).Result(); err != nil {
+		logger.Error("[Model.Auth] Cannot set password", err)
 		return ErrDbInternal
 	}
 	return nil
