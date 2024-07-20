@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 
-	_db "github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/redis/go-redis/v9"
 )
@@ -41,16 +40,15 @@ func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err err
 	logger := db.lg
 
 	passwd, err := db.client.Get(defaultCtx, "pswd:"+username).Result()
-	if err != nil {
-		switch err {
-		case _db.ErrNotFound:
-			msg := fmt.Sprintf("[Model.Auth] Cannot find user %s", username)
-			logger.Error(msg, err)
-			return "", ErrNotFound
-		default:
-			logger.Error("[Model.Auth] Db error", err)
-			return "", ErrDbInternal
-		}
+	switch err {
+	case redis.Nil:
+		msg := fmt.Sprintf("[Model.Auth] Cannot find user %s", username)
+		logger.Error(msg, err)
+		return "", ErrNotFound
+	case nil:
+	default:
+		logger.Error("[Model.Auth] Db error", err)
+		return "", ErrDbInternal
 	}
 	if passwd == "" {
 		return "", ErrSyntax

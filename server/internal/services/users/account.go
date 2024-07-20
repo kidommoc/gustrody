@@ -86,15 +86,14 @@ func (service *UserService) UpdateProfile(username string, body *ProfileBody) er
 	logger := service.lg
 
 	pf, err := service.db.Info.QueryUser(username)
-	if err != nil {
-		switch err {
-		case models.ErrNotFound:
-			return ErrUserNotFound
-		default:
-			msg := fmt.Sprintf("[Users.Account] Cannot get profile of %s.", username)
-			logger.Error(msg, err)
-			return ErrInternal
-		}
+	switch err {
+	case models.ErrNotFound:
+		return ErrUserNotFound
+	case nil:
+	default:
+		msg := fmt.Sprintf("[Users.Account] Cannot get profile of %s.", username)
+		logger.Error(msg, err)
+		return ErrInternal
 	}
 
 	if body.Nickname != nil {
@@ -130,15 +129,14 @@ func (service *UserService) UpdateProfile(username string, body *ProfileBody) er
 func (service *UserService) GetPreferences(username string) (pf Preferences, err error) {
 	logger := service.lg
 	mpf, err := service.db.Account.QueryUserPreferences(username)
-	if err != nil {
-		switch err {
-		case models.ErrNotFound:
-			return pf, ErrUserNotFound
-		default:
-			msg := fmt.Sprintf("[Users.Account] Cannot get preferences of %s.", username)
-			logger.Error(msg, err)
-			return pf, ErrInternal
-		}
+	switch err {
+	case models.ErrNotFound:
+		return pf, ErrUserNotFound
+	case nil:
+	default:
+		msg := fmt.Sprintf("[Users.Account] Cannot get preferences of %s.", username)
+		logger.Error(msg, err)
+		return pf, ErrInternal
 	}
 	pf.PostVsb, _ = utils.GetVsb(mpf.PostVsb)
 	pf.ShareVsb, _ = utils.GetVsb(mpf.ShareVsb)
@@ -155,15 +153,14 @@ func (service *UserService) UpdatePreferences(username string, body *PreferenceB
 	logger := service.lg
 
 	pf, err := service.db.Account.QueryUserPreferences(username)
-	if err != nil {
-		switch err {
-		case models.ErrNotFound:
-			return ErrUserNotFound
-		default:
-			msg := fmt.Sprintf("[Users.Account] Cannot get preferences of %s.", username)
-			logger.Error(msg, err)
-			return ErrInternal
-		}
+	switch err {
+	case models.ErrNotFound:
+		return ErrUserNotFound
+	case nil:
+	default:
+		msg := fmt.Sprintf("[Users.Account] Cannot get preferences of %s.", username)
+		logger.Error(msg, err)
+		return ErrInternal
 	}
 
 	if body.PostVsb != nil {

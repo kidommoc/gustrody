@@ -49,19 +49,18 @@ func getPost(c *fiber.Ctx) error {
 	var postService *posts.PostService
 	services.Get(reflect.ValueOf(&postService).Elem())
 	post, err := postService.Get(username, postID)
-	if err != nil {
-		switch err {
-		case posts.ErrNotPermitted:
-			return c.SendStatus(fiber.StatusForbidden)
-		case posts.ErrPostNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("Post not found.")
-		case posts.ErrOwner:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("Post owner not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case posts.ErrNotPermitted:
+		return c.SendStatus(fiber.StatusForbidden)
+	case posts.ErrPostNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("Post not found.")
+	case posts.ErrOwner:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("Post owner not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()
@@ -85,16 +84,15 @@ func getPostLikes(c *fiber.Ctx) error {
 	var postService *posts.PostService
 	services.Get(reflect.ValueOf(&postService).Elem())
 	list, err := postService.GetLikes(username, postID)
-	if err != nil {
-		switch err {
-		case posts.ErrNotPermitted:
-			return c.SendStatus(fiber.StatusForbidden)
-		case posts.ErrPostNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("Post not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case posts.ErrNotPermitted:
+		return c.SendStatus(fiber.StatusForbidden)
+	case posts.ErrPostNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("Post not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()
@@ -118,16 +116,15 @@ func getPostShares(c *fiber.Ctx) error {
 	var postService *posts.PostService
 	services.Get(reflect.ValueOf(&postService).Elem())
 	list, err := postService.GetShares(username, postID)
-	if err != nil {
-		switch err {
-		case posts.ErrNotPermitted:
-			return c.SendStatus(fiber.StatusForbidden)
-		case posts.ErrPostNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("Post not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case posts.ErrNotPermitted:
+		return c.SendStatus(fiber.StatusForbidden)
+	case posts.ErrPostNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("Post not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()

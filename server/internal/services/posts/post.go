@@ -75,7 +75,7 @@ func (service *PostService) Get(user, postID string) (post *Post, err error) {
 	if e != nil {
 		switch e {
 		case models.ErrNotFound:
-			// try foreign
+			// !!try foreign
 			return post, ErrPostNotFound
 		default:
 			msg := fmt.Sprintf("[Posts] ")

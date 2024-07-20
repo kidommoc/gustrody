@@ -15,15 +15,14 @@ func (service *PostService) GetShares(user, postID string) (list []*users.UserIn
 	// !!may update foreign
 
 	post, err := service.db.Query.QueryPostByID(postID)
-	if err != nil {
-		switch err {
-		case models.ErrNotFound:
-			return nil, ErrPostNotFound
-		default:
-			msg := fmt.Sprintf("[Posts.Share] Cannot query %s", postID)
-			logger.Error(msg, err)
-			return nil, ErrInternal
-		}
+	switch err {
+	case models.ErrNotFound:
+		return nil, ErrPostNotFound
+	case nil:
+	default:
+		msg := fmt.Sprintf("[Posts.Share] Cannot query %s", postID)
+		logger.Error(msg, err)
+		return nil, ErrInternal
 	}
 	if !service.checkPermission(user, &post) {
 		return nil, ErrNotPermitted
@@ -97,12 +96,7 @@ func (service *PostService) Unshare(username, postID string) error {
 	if err := service.db.Share.RemoveShare(models.NewUD(username), postID); err != nil {
 		switch err {
 		case models.ErrNotFound:
-			switch err.Error() {
-			case "post":
-				return ErrPostNotFound
-			case "share":
-				return ErrShareNotFound
-			}
+			return ErrPostNotFound
 		default:
 			msg := fmt.Sprintf("[Posts.Share] Cannot remove share of %s to %s", username, postID)
 			logger.Error(msg, err)

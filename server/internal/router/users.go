@@ -59,7 +59,7 @@ func registerUser(c *fiber.Ctx) error {
 		body.Username, body.Nickname, body.Password,
 	); err != nil {
 		switch err {
-		//
+		// handle error
 		}
 	}
 
@@ -85,7 +85,7 @@ func changePassword(c *fiber.Ctx) error {
 	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.UpdatePassword(username, body.Password); err != nil {
 		switch err {
-		//
+		// handle error
 		}
 	}
 
@@ -107,7 +107,7 @@ func editUserProfile(c *fiber.Ctx) error {
 	services.Get(reflect.ValueOf(&userService).Elem())
 	if err := userService.UpdateProfile(username, body); err != nil {
 		switch err {
-		//
+		// handle error
 		}
 	}
 
@@ -126,10 +126,9 @@ func getUserPreferences(c *fiber.Ctx) error {
 	var userService *users.UserService
 	services.Get(reflect.ValueOf(&userService).Elem())
 	preferences, err := userService.GetPreferences(username)
-	if err != nil {
-		switch err {
-		// handle error
-		}
+	switch err {
+	// handle error
+	case nil:
 	}
 
 	logger := logging.Get()
@@ -171,14 +170,13 @@ func getUserProfile(c *fiber.Ctx) error {
 	var userService *users.UserService
 	services.Get(reflect.ValueOf(&userService).Elem())
 	profile, err := userService.GetProfile(username)
-	if err != nil {
-		switch err {
-		case users.ErrUserNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("User not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case users.ErrUserNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("User not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()
@@ -202,14 +200,13 @@ func getUserPosts(c *fiber.Ctx) error {
 	var postService *posts.PostService
 	services.Get(reflect.ValueOf(&postService).Elem())
 	list, err := postService.GetByUser(username, target)
-	if err != nil {
-		switch err {
-		case posts.ErrUserNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("User not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case posts.ErrUserNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("User not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()
@@ -229,14 +226,13 @@ func getUserFollowings(c *fiber.Ctx) error {
 	var userService *users.UserService
 	services.Get(reflect.ValueOf(&userService).Elem())
 	list, err := userService.GetFollowings(username)
-	if err != nil {
-		switch err {
-		case users.ErrUserNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("User not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case users.ErrUserNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("User not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()
@@ -258,14 +254,13 @@ func getUserFollowers(c *fiber.Ctx) error {
 	var userService *users.UserService
 	services.Get(reflect.ValueOf(&userService).Elem())
 	list, err := userService.GetFollowers(username)
-	if err != nil {
-		switch err {
-		case users.ErrUserNotFound:
-			c.Status(fiber.StatusNotFound)
-			return c.SendString("User not found.")
-		default:
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+	switch err {
+	case users.ErrUserNotFound:
+		c.Status(fiber.StatusNotFound)
+		return c.SendString("User not found.")
+	case nil:
+	default:
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	logger := logging.Get()

@@ -179,6 +179,7 @@ func (service *mockingFileService) StoreImage(buf []byte) (url string, mediaType
 	}
 	switch t {
 	case "jpg":
+		ext = "jpeg"
 	case "jpeg":
 		ext = "jpeg"
 	case "png":

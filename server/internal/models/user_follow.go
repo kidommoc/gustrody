@@ -26,11 +26,10 @@ func (db *UserDb) IsFollowing(username, target UD) bool {
 	if e := r.Scan(&n); e != nil {
 		switch e {
 		case sql.ErrNoRows:
-			return false
 		default:
 			logger.Error("[Model.UserFollow] Cannot query", e)
-			return false
 		}
+		return false
 	}
 	return true
 }

@@ -59,6 +59,7 @@ func (db *UserDb) GetForeignUserByUD(username UD) (user ForeignUser, err error) 
 			return user, ErrNotFound
 		default:
 			logger.Error("[Model.UserForeign] Cannot scan row of foreign user.", err)
+			return user, ErrDbInternal
 		}
 	}
 	return user, nil
@@ -80,6 +81,7 @@ func (db *UserDb) GetForeignUserByID(id string) (user ForeignUser, err error) {
 			return user, ErrNotFound
 		default:
 			logger.Error("[Model.UserForeign] Cannot scan row of foreign user.", err)
+			return user, ErrDbInternal
 		}
 	}
 	return user, nil

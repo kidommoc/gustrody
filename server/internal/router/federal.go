@@ -33,11 +33,10 @@ func webfinger(c *fiber.Ctx) error {
 	var federalService *federal.FederalService
 	services.Get(reflect.ValueOf(&federalService).Elem())
 	result, err := federalService.Webfinger(username)
-	if err != nil {
-		switch err {
-		case federal.ErrNotFound:
-			return c.SendStatus(fiber.StatusNotFound)
-		}
+	switch err {
+	case federal.ErrNotFound:
+		return c.SendStatus(fiber.StatusNotFound)
+	case nil:
 	}
 	msg := fmt.Sprintf("[FEDERAL] Webfinger: %s.", username)
 	logger.Info(msg)

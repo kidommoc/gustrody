@@ -16,13 +16,13 @@ import (
 // models
 
 type User struct {
-	Username    UD          `json:"username"`
-	Nickname    string      `json:"nickname"`
-	Summary     string      `json:"summary"`
-	Avatar      Img         `json:"avatar"`
-	Date        time.Time   `json:"date"`
-	Keys        KeyPair     `json:"keys"`
-	Preferences Preferences `json:"preferences"`
+	Username    UD          `json:"username,omitempty"`
+	Nickname    string      `json:"nickname,omitempty"`
+	Summary     string      `json:"summary,omitempty"`
+	Avatar      Img         `json:"avatar,omitempty"`
+	Date        time.Time   `json:"date,omitempty"`
+	Keys        KeyPair     `json:"keys,omitempty"`
+	Preferences Preferences `json:"preferences,omitempty"`
 }
 
 type UD struct {

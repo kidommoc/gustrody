@@ -8,6 +8,8 @@ import (
 	"github.com/lib/pq"
 )
 
+const redisMaxRetries = 20
+
 // magic
 type SV[P driver.Valuer] interface {
 	sql.Scanner

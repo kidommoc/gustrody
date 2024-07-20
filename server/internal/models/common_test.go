@@ -5,6 +5,7 @@ import (
 )
 
 var modelscfg = config.Config{
+	Debug:    true,
 	PqUser:   "penguin",
 	PqSecret: "postgres",
 	RdSecret: "redis",

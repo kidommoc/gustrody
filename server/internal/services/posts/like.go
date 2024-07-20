@@ -11,15 +11,14 @@ func (service *PostService) GetLikes(user, postID string) (list []*users.UserInf
 	logger := service.lg
 
 	post, err := service.db.Query.QueryPostByID(postID)
-	if err != nil {
-		switch err {
-		case models.ErrNotFound:
-			return nil, ErrPostNotFound
-		default:
-			msg := fmt.Sprintf("[Posts.Share] Cannot query %s", postID)
-			logger.Error(msg, err)
-			return nil, ErrInternal
-		}
+	switch err {
+	case models.ErrNotFound:
+		return nil, ErrPostNotFound
+	case nil:
+	default:
+		msg := fmt.Sprintf("[Posts.Share] Cannot query %s", postID)
+		logger.Error(msg, err)
+		return nil, ErrInternal
 	}
 	if !service.checkPermission(user, &post) {
 		return nil, ErrNotPermitted
@@ -80,12 +79,7 @@ func (service *PostService) Unlike(username, postID string) error {
 	if err := service.db.Like.RemoveLike(models.NewUD(username), postID); err != nil {
 		switch err {
 		case models.ErrNotFound:
-			switch err.Error() {
-			case "post":
-				return ErrPostNotFound
-			case "like":
-				return ErrLikeNotFound
-			}
+			return ErrPostNotFound
 		default:
 			msg := fmt.Sprintf("[Posts.Like] Cannot remove like of %s to %s", username, postID)
 			logger.Error(msg, err)

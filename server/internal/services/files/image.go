@@ -31,6 +31,7 @@ func (service *FileService) StoreImage(buf []byte) (url string, mediaType string
 	}
 	switch t {
 	case "jpg":
+		img.Ext = TYPE_JPEG
 	case "jpeg":
 		img.Ext = TYPE_JPEG
 	case "png":

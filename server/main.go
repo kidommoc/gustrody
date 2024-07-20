@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/kidommoc/gustrody/internal/config"
-	"github.com/kidommoc/gustrody/internal/db"
 	"github.com/kidommoc/gustrody/internal/models"
 	"github.com/kidommoc/gustrody/internal/router"
 	"github.com/kidommoc/gustrody/internal/services"
@@ -12,7 +11,6 @@ import (
 
 func main() {
 	cfg := config.Get()
-	db.Init()
 	models.Init()
 	services.Init()
 

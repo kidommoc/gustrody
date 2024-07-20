@@ -19,7 +19,7 @@ func (service *UserService) Follow(actor, target string) error {
 	act := models.NewUD(actor)
 	tgt := models.NewUD(target)
 	if act.Username == "" || tgt.Username == "" {
-		// error
+		// handle error
 	}
 	if err := service.db.Follow.SetFollow(act, tgt); err != nil {
 		switch err {
@@ -48,7 +48,7 @@ func (service *UserService) Unfollow(actor, target string) error {
 	act := models.NewUD(actor)
 	tgt := models.NewUD(target)
 	if act.Username == "" || tgt.Username == "" {
-		// error
+		// handle error
 	}
 	if err := service.db.Follow.RemoveFollow(act, tgt); err != nil {
 		switch err {

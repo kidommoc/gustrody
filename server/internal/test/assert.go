@@ -20,8 +20,9 @@ func AssertEqual(t *testing.T, want interface{}, got interface{}) {
 	tg := reflect.TypeOf(got)
 	if tw != tg {
 		t.Errorf("Want and got are different types\nwant: %s, got: %s",
-			tw.Name(), tg.Name(),
+			tw.String(), tg.String(),
 		)
+		return
 	}
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("Want and got are not equal:\nwant: %+v\ngot: %+v",
