@@ -131,13 +131,15 @@ Representing a list, such as followers or outbox content.
 ```json
 {
   "@context": "https://www.w3.org/ns/activitystreams",
-  "id": "https://instance.url/users/ownerID/collectionID",
+  "id": "https://instance.url/collectionID",
   "type": "Collection",
   "totalItems": 128,
   "first": "https://id.of/collection?page=1"
 }
 ```
 
+- Replies ID: `https://instance.url/posts/postID/replies`
+- Outbox ID: `https://instance.url/users/username/outbox`
 - It's ok to embed a `CollectoinPage` in `Collection.first`
 
 ### CollectionPage
@@ -166,7 +168,7 @@ Representing a list, such as followers or outbox content.
 
 ```json
 {
-  "type": "Document",
+  "type": "Document or Image",
   "mediaType": "image/jpeg or image/png",
   "url": "https://instance.url/imgs/filename.ext",
   "name": "alternative text",
