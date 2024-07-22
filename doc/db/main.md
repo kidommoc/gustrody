@@ -30,7 +30,6 @@ CREATE TYPE img AS (
 - username *PRIMARY*: `varchar(20)`
 - nickname: `text`
 - summary *NULLABLE*: `text`
-- createdAt: `timestamp`
 - avatar *NULLABLE*: `img`
 - keys: `kp` as user's key pair
 - preference: `json`
@@ -40,7 +39,6 @@ CREATE TABLE IF NOT EXISTS users (
   "username" varchar(20) PRIMARY KEY,
   "nickname" text NOT NULL,
   "summary" text,
-  "createdAt" timestamp NOT NULL,
   "avatar" img,
   "keys" kp NOT NULL,
   "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
@@ -65,11 +63,10 @@ WHERE "username" = ${username};
 
 ```sql
 INSERT INTO users(
-  "username", "nickname", "createAt", "keys"
+  "username", "nickname", "keys"
 )
 VALUES (
-  ${username}, ${nickname}, NOW(),
-  ROW(${pub_key}, ${pri_key})
+  ${username}, ${nickname}, ROW(${pub_key}, ${pri_key})
 );
 ```
 

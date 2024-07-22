@@ -10,6 +10,15 @@ Use Redis. Max memory policy: Least frequently used.
 
 `posts:<USERNAME>`: the posts and shares of the specified user. Type: `LIST` of `json` array as cached page.
 
+> index page: (`LIST[0]`)
+>
+> ```json
+> [
+>   "datetime string of page 1",
+>   "datetime string of page 2", ...
+> ]
+> ```
+
 > page syntax:
 >
 > ```json

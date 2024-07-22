@@ -51,7 +51,7 @@ func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err err
 		return "", ErrDbInternal
 	}
 	if passwd == "" {
-		return "", ErrSyntax
+		return "", ErrFormat
 	}
 	return passwd, nil
 }
@@ -62,7 +62,7 @@ func (db *AuthDb) QueryPasswordOfUser(username string) (password string, err err
 //   - Syntax "empty password"
 func (db *AuthDb) SetUserPassword(username, password string) error {
 	if password == "" {
-		return ErrSyntax
+		return ErrFormat
 	}
 	logger := db.lg
 

@@ -1,6 +1,9 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"encoding/json"
+)
 
 type IUserInfo interface {
 	IsUserExist(username string) bool
@@ -32,15 +35,33 @@ func (db *UserDb) IsUserExist(username string) bool {
 //   - NotFound "user"
 func (db *UserDb) QueryUser(username string) (user User, err error) {
 	logger := db.lg
+	if username == "" {
+		return user, ErrFormat
+	}
 
-	qs := ` SELECT "username", "nickname", "summary", "createdAt"
+	// try query cache
+	ss, err := db.cache.CacheQueryString([]string{"user:" + username})
+	if err == nil && ss["user:"+username] != "" {
+		err = json.Unmarshal([]byte(ss["user:"+username]), &user)
+		if err == nil {
+			// cache hit
+			return user, nil
+		}
+		// cache corrupted. clear cache
+		db.cache.CacheRemoveString("user:" + username)
+	} else if err != nil && err != ErrNotFound {
+		// don't return
+		logger.Warning("[Models.QueryUser] Failed to query cache.", "error", err)
+	}
+
+	qs := ` SELECT "username", "nickname", "summary", "avatar"
 			FROM users
 			WHERE "username" = $1;`
 	r := db.client.QueryRow(qs, username)
-	var nkn sql.NullString
-	var smy sql.NullString
+
+	user = User{}
 	if e := r.Scan(
-		&user.Username.Username, &nkn, &smy, &user.Date,
+		&user.Username.Username, &user.Nickname, &user.Summary, &user.Avatar,
 	); e != nil {
 		switch e {
 		case sql.ErrNoRows:
@@ -50,12 +71,11 @@ func (db *UserDb) QueryUser(username string) (user User, err error) {
 			return user, ErrDbInternal
 		}
 	}
-	if nkn.Valid {
-		user.Nickname = nkn.String
-	}
-	if smy.Valid {
-		user.Summary = smy.String
-	}
+
+	// cache
+	s, _ := json.Marshal(user)
+	go db.cache.CacheSetString("user:"+user.Username.String(), string(s), true)
+
 	return user, nil
 }
 
@@ -74,5 +94,14 @@ func (db *UserDb) UpdateUser(user *User) error {
 	if r == 0 {
 		return ErrNotFound
 	}
+
+	// cache
+	summary := user.Summary
+	if summary == "" {
+		summary = stringClearFlag
+	}
+	go db.cache.CacheUpdateJson("user:"+user.Username.String(), User{
+		Nickname: user.Nickname, Summary: summary, Avatar: user.Avatar,
+	})
 	return nil
 }

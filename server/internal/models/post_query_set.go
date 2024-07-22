@@ -2,21 +2,23 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/kidommoc/gustrody/internal/utils"
+	"github.com/lib/pq"
 )
 
 type IPostQuery interface {
 	IsPostExist(id string) bool
-	QueryPostByID(id string) (post Post, err error)
+	QueryPost(id string) (post Post, err error)
 	QueryPostReplies(id string) (replyings []*Post, replies []*Post, err error)
 	QueryPostsAndSharesByUser(user string, asec bool) (list []*Post, err error)
 }
 
 type IPostSet interface {
-	SetPost(p *Post, attachments []Img) error
-	UpdatePost(p *Post, attachments []Img) error
+	SetPost(p *Post) error
+	UpdatePost(p *Post) error
 	RemovePost(id string) error
 }
 
@@ -40,10 +42,29 @@ func (db *PostDb) IsPostExist(id string) bool {
 //
 //   - DbInternal
 //   - NotFound "post"
-func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
+func (db *PostDb) QueryPost(id string) (post Post, err error) {
 	logger := db.lg
+	if id == "" {
+		return post, ErrFormat
+	}
+
+	// try query cache
+	ss, err := db.cache.CacheQueryString([]string{"post:" + id})
+	if err == nil && ss["post:"+id] != "" {
+		err = json.Unmarshal([]byte(ss["post:"+id]), &post)
+		if err == nil {
+			// cache hit
+			return post, nil
+		}
+		// cache corrupted. clear cache
+		db.cache.CacheRemoveString("post:" + id)
+	} else if err != nil && err != ErrNotFound {
+		// don't return
+		logger.Warning("[Models.QueryPost] Failed to query cache.", "error", err)
+	}
+
 	qs := ` SELECT
-			  "id", "url", "user", "date", "vsb", "content", "media",
+			  "id", "url", "user", "date", "replying", "vsb", "content", "media",
 			  CARDINALITY("likes") as "likes", CARDINALITY("shares") as "shares"
 			FROM posts
 			WHERE "id" = $1;`
@@ -51,9 +72,10 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
 
 	post = Post{}
 	var vsb string
+	var rpy sql.NullString
 	if e := r.Scan(
 		&post.ID, &post.Url, &post.User, &post.Date,
-		&vsb, &post.Content, post.Media.ScanArray(),
+		&rpy, &vsb, &post.Content, pq.Array(&post.Media),
 		&post.Likes, &post.Shares,
 	); e != nil {
 		switch e {
@@ -65,6 +87,20 @@ func (db *PostDb) QueryPostByID(id string) (post Post, err error) {
 		}
 	}
 	post.Vsb, _ = utils.GetVsb(vsb)
+	if rpy.Valid {
+		qs = `SELECT "user" FROM posts WHERE "id" = $1;`
+		r := db.client.QueryRow(qs, rpy.String)
+		var u UD
+		if err := r.Scan(&u); err == nil {
+			post.Replying = rpy.String
+			post.ReplyTo = u.String()
+		}
+	}
+
+	// cache
+	s, _ := json.Marshal(post)
+	go db.cache.CacheSetString("post:"+post.ID, string(s), false)
+
 	return post, nil
 }
 
@@ -105,7 +141,7 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, p.Media.ScanArray(),
+			&vsb, &p.Content, pq.Array(&p.Media),
 			&p.Likes, &p.Shares,
 			&rpy, &p.Level,
 		); e != nil {
@@ -145,7 +181,7 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []*Post, replies []*Pos
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, p.Media.ScanArray(),
+			&vsb, &p.Content, pq.Array(&p.Media),
 			&p.Likes, &p.Shares,
 			&rpy, &p.Level,
 		); e != nil {
@@ -213,7 +249,7 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 		var vsb string
 		if e := r.Scan(
 			&p.ID, &p.Url, &p.User, &p.Date,
-			&vsb, &p.Content, p.Media.ScanArray(),
+			&vsb, &p.Content, pq.Array(&p.Media),
 			&p.Likes, &p.Shares,
 			&rpt, &shb, &p.ActDate,
 		); e != nil {
@@ -229,14 +265,15 @@ func (db *PostDb) QueryPostsAndSharesByUser(user string, asc bool) (list []*Post
 		p.Vsb, _ = utils.GetVsb(vsb)
 		list = append(list, &p)
 	}
+	// !!cache
 	return list, nil
 }
 
 // ERRORS
 //
 //   - DbInternal
-//   - Dunplicate "post"
-func (db *PostDb) SetPost(p *Post, attachments []Img) error {
+//   - Dunplicate
+func (db *PostDb) SetPost(p *Post) error {
 	logger := db.lg
 	if p.Replying != "" && !db.IsPostExist(p.Replying) {
 		return ErrNotFound
@@ -245,10 +282,14 @@ func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 	qs := ` INSERT INTO posts("id", "url", "user", "date", "replying", "vsb", "content", "media")
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`
 	p.Date = p.Date.UTC()
+	var x *string
+	if p.Replying != "" {
+		x = &p.Replying
+	}
 	r, e := sqlExec(db.client.Exec(qs,
 		p.ID, p.Url, p.User, p.Date,
-		p.Replying, p.Vsb.String(), p.Content,
-		NewArray(attachments).ValueArray(),
+		x, p.Vsb.String(), p.Content,
+		pq.Array(p.Media),
 	))
 	if e != nil {
 		logger.Error("[Model.Posts] Failed to execute", e)
@@ -257,20 +298,41 @@ func (db *PostDb) SetPost(p *Post, attachments []Img) error {
 	if r == 0 {
 		return ErrDunplicate
 	}
+
+	// cache
+	p.ReplyTo = ""
+	if p.Replying != "" {
+		qs = `SELECT "user" FROM posts WHERE "id" = $1;`
+		r := db.client.QueryRow(qs, p.Replying)
+		var u UD
+		if err := r.Scan(&u); err == nil {
+			p.ReplyTo = u.String()
+		} else {
+			p.Replying = ""
+		}
+	}
+	s, _ := json.Marshal(Post{
+		ID: p.ID, Url: p.Url, User: p.User,
+		Date: p.Date, Vsb: p.Vsb,
+		Content: p.Content, Media: p.Media,
+		Replying: p.Replying, ReplyTo: p.ReplyTo,
+		Likes: 0, Shares: 0,
+	})
+	go db.cache.CacheSetString("post:"+p.ID, string(s), false)
 	return nil
 }
 
 // ERRORS
 //
 //   - DbInternal
-//   - NotFound "post"
-func (db *PostDb) UpdatePost(p *Post, attachments []Img) error {
+//   - NotFound
+func (db *PostDb) UpdatePost(p *Post) error {
 	logger := db.lg
 	qs := ` UPDATE posts
 			SET "date" = $2, "content" = $3, "media" = $4
 			WHERE "id" = $1;`
 	p.Date = p.Date.UTC()
-	r, e := sqlExec(db.client.Exec(qs, p.ID, p.Date, p.Content, NewArray(attachments).ValueArray()))
+	r, e := sqlExec(db.client.Exec(qs, p.ID, p.Date, p.Content, pq.Array(p.Media)))
 	if e != nil {
 		logger.Error("[Model.Posts] Failed to execute", e)
 		return ErrDbInternal
@@ -278,13 +340,18 @@ func (db *PostDb) UpdatePost(p *Post, attachments []Img) error {
 	if r == 0 {
 		return ErrNotFound
 	}
+
+	// cache
+	go db.cache.CacheUpdateJson("post:"+p.ID, Post{
+		Date: p.Date, Content: p.Content, Media: p.Media,
+	})
 	return nil
 }
 
 // ERRORS
 //
 //   - DbInternal
-//   - NotFound "post"
+//   - NotFound
 func (db *PostDb) RemovePost(id string) error {
 	logger := db.lg
 	if !db.IsPostExist(id) {
@@ -301,5 +368,8 @@ func (db *PostDb) RemovePost(id string) error {
 	if r == 0 {
 		return ErrNotFound
 	}
+
+	// cache
+	go db.cache.CacheRemoveString("post:" + id)
 	return nil
 }

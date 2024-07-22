@@ -40,7 +40,7 @@ func (service *UserService) Register(username, nickname, password string) error 
 	password = string(utils.SHA256Hash(password))
 	if err := service.db.Auth.SetUserPassword(username, password); err != nil {
 		switch err {
-		case models.ErrSyntax:
+		case models.ErrFormat:
 			return ErrSyntax
 		default:
 			msg := fmt.Sprintf("[Users.Account] Failed to update password of %s.", username)
@@ -61,7 +61,7 @@ func (service *UserService) UpdatePassword(username, newPwd string) error {
 	newPwd = string(utils.SHA256Hash(newPwd))
 	if err := service.db.Auth.SetUserPassword(username, newPwd); err != nil {
 		switch err {
-		case models.ErrSyntax:
+		case models.ErrFormat:
 			return ErrSyntax
 		default:
 			msg := fmt.Sprintf("[Users.Account] Failed to update password of %s.", username)

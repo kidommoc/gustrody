@@ -141,7 +141,7 @@ func (db *mockingUserForeignDb) GetForeignUserByID(id string) (user models.Forei
 
 func (db *mockingUserForeignDb) SetForeignUser(user *models.ForeignUser) error {
 	if user.Username == models.NewUD("") {
-		return models.ErrSyntax
+		return models.ErrFormat
 	}
 	db.data[user.Username] = *user
 	return nil

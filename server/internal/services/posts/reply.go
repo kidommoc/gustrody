@@ -38,19 +38,17 @@ func (service *PostService) Reply(username, postID, vsb, content string, date ti
 		v = pf.PostVsb
 	}
 
-	imgs := []models.Img{}
-	for i, v := range attachments {
-		if i >= service.maxImgInPost {
-			break
-		}
-		imgs = append(imgs, ToModelImg(v))
-	}
-
 	p := models.Post{
 		ID: id, Url: url, User: models.NewUD(username),
 		Date: date, Replying: postID, Vsb: v, Content: content,
 	}
-	if e := service.db.Set.SetPost(&p, imgs); e != nil {
+	for i, v := range attachments {
+		if i >= service.maxImgInPost {
+			break
+		}
+		p.Media = append(p.Media, ToModelImg(v))
+	}
+	if e := service.db.Set.SetPost(&p); e != nil {
 		switch e {
 		case models.ErrNotFound:
 			return ErrPostNotFound

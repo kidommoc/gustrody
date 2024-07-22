@@ -36,10 +36,10 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 		Content:     p.Content,
 		Likes:       p.Likes,
 		Shares:      p.Shares,
-		Attachments: make([]AttachImg, 0, len(p.Media.Data())),
+		Attachments: make([]AttachImg, 0, len(p.Media)),
 	}
 
-	for _, v := range p.Media.Data() {
+	for _, v := range p.Media {
 		a := strings.Split(v.Url, ".")
 		if len(a) < 2 {
 			logger.Warning("[Post] Wrong image url: no extension",
@@ -53,11 +53,9 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 			Alt:  v.Alt,
 		}
 		ext := a[len(a)-1]
-		switch ext {
-		case "jpeg":
-		case "png":
+		if ext == "jpeg" || ext == "png" {
 			img.Type = "image/" + ext
-		default:
+		} else {
 			logger.Warning("[Post] Wrong image url: wrong extension",
 				"url", v.Url,
 			)
@@ -71,7 +69,7 @@ func (service *PostService) makePost(p *models.Post, us ...*users.UserInfo) (pos
 
 func (service *PostService) Get(user, postID string) (post *Post, err error) {
 	logger := service.lg
-	result, e := service.db.Query.QueryPostByID(postID)
+	result, e := service.db.Query.QueryPost(postID)
 	if e != nil {
 		switch e {
 		case models.ErrNotFound:
@@ -192,14 +190,6 @@ func (service *PostService) New(username, vsb, content string, date time.Time, a
 	}
 	url := utils.GeneratePostID(id, service.scheme, service.domain)
 
-	imgs := []models.Img{}
-	for i, v := range attachments {
-		if i >= service.maxImgInPost {
-			break
-		}
-		imgs = append(imgs, ToModelImg(v))
-	}
-
 	v, ok := utils.GetVsb(vsb)
 	if !ok {
 		pf, err := service.user.GetPreferences(username)
@@ -214,7 +204,13 @@ func (service *PostService) New(username, vsb, content string, date time.Time, a
 		ID: id, Url: url, User: models.NewUD(username),
 		Date: date, Replying: "", Vsb: v, Content: content,
 	}
-	if e := service.db.Set.SetPost(&p, imgs); e != nil {
+	for i, v := range attachments {
+		if i >= service.maxImgInPost {
+			break
+		}
+		p.Media = append(p.Media, ToModelImg(v))
+	}
+	if e := service.db.Set.SetPost(&p); e != nil {
 		logger.Error("[Post] Cannot set post", e)
 		return ErrInternal
 	}
@@ -231,7 +227,7 @@ func (service *PostService) Edit(username, postID, content string, attachments [
 		return ErrContentTooLong
 	}
 
-	post, e := service.db.Query.QueryPostByID(postID)
+	post, e := service.db.Query.QueryPost(postID)
 	if e != nil {
 		switch e {
 		case models.ErrNotFound:
@@ -246,18 +242,16 @@ func (service *PostService) Edit(username, postID, content string, attachments [
 		return ErrOwner
 	}
 
-	imgs := []models.Img{}
+	p := models.Post{
+		ID: postID, Date: time.Now(), Content: content,
+	}
 	for i, v := range attachments {
 		if i >= service.maxImgInPost {
 			break
 		}
-		imgs = append(imgs, ToModelImg(v))
+		p.Media = append(p.Media, ToModelImg(v))
 	}
-
-	p := models.Post{
-		ID: postID, Date: time.Now(), Content: content,
-	}
-	if e := service.db.Set.UpdatePost(&p, imgs); e != nil {
+	if e := service.db.Set.UpdatePost(&p); e != nil {
 		switch e {
 		case models.ErrNotFound:
 			return ErrPostNotFound
@@ -273,7 +267,7 @@ func (service *PostService) Edit(username, postID, content string, attachments [
 
 func (service *PostService) Remove(username, postID string) error {
 	logger := service.lg
-	post, e := service.db.Query.QueryPostByID(postID)
+	post, e := service.db.Query.QueryPost(postID)
 	if e != nil {
 		switch e {
 		case models.ErrNotFound:

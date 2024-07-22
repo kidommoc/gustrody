@@ -1,48 +1,59 @@
 package models
 
 import (
-	"database/sql"
 	"database/sql/driver"
-
-	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/lib/pq"
+	"fmt"
+	"strings"
 )
 
 const redisMaxRetries = 20
+const redisPageSize = 20
 
-// magic
-type SV[P driver.Valuer] interface {
-	sql.Scanner
-	*P
+type Img struct {
+	Type string `json:"type,omitempty"`
+	Url  string `json:"url,omitempty"`
+	Alt  string `json:"alt,omitempty"`
 }
 
-type Array[P driver.Valuer, T SV[P]] struct {
-	lg   logging.Logger
-	data []P
+// implement database/sql/driver.Valuer
+func (img Img) Value() (driver.Value, error) {
+	t := img.Type
+	u := img.Url
+	a := img.Alt
+	if t != "" {
+		t = fmt.Sprintf(`\"%s\"`, t)
+	}
+	if u != "" {
+		u = fmt.Sprintf(`\"%s\"`, u)
+	}
+	if a != "" {
+		a = fmt.Sprintf(`\"%s\"`, a)
+	}
+	return fmt.Sprintf(`(%s,%s,%s)`, t, u, a), nil
 }
 
-func NewArray[P driver.Valuer, T SV[P]](arr []P) *Array[P, T] {
-	return &Array[P, T]{data: arr}
-}
-
-func (arr *Array[P, T]) Data() []P {
-	return arr.data
-}
-
-func (arr *Array[P, T]) Append(item P) {
-	arr.data = append(arr.data, item)
-}
-
-func (arr *Array[P, T]) ScanArray() interface {
-	driver.Valuer
-	sql.Scanner
-} {
-	return pq.Array(&arr.data)
-}
-
-func (arr *Array[P, T]) ValueArray() interface {
-	driver.Valuer
-	sql.Scanner
-} {
-	return pq.Array(arr.data)
+// implement database/sql.Scanner
+func (img *Img) Scan(src interface{}) error {
+	if src == nil {
+		return fmt.Errorf("nil")
+	}
+	b, ok := src.([]byte)
+	if !ok {
+		s, ok := src.(string)
+		if !ok {
+			return fmt.Errorf("Scan img: src cannot cast to []byte")
+		}
+		if s == "" {
+			return nil
+		}
+		b = []byte(s)
+	}
+	fields := strings.Split(strings.Trim(string(b), "()"), ",")
+	if len(fields) < 3 {
+		return fmt.Errorf("Scan img: wrong fields number")
+	}
+	img.Type = strings.TrimSuffix(strings.TrimPrefix(fields[0], `"""`), `"""`)
+	img.Url = strings.TrimSuffix(strings.TrimPrefix(fields[1], `"""`), `"""`)
+	img.Alt = strings.TrimSuffix(strings.TrimPrefix(fields[2], `"""`), `"""`)
+	return nil
 }

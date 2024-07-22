@@ -14,7 +14,7 @@ func (service *PostService) GetShares(user, postID string) (list []*users.UserIn
 
 	// !!may update foreign
 
-	post, err := service.db.Query.QueryPostByID(postID)
+	post, err := service.db.Query.QueryPost(postID)
 	switch err {
 	case models.ErrNotFound:
 		return nil, ErrPostNotFound

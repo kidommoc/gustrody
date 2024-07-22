@@ -17,7 +17,7 @@ func mapping(args ...any) map[string]string {
 	m := make(map[string]string)
 	key := ""
 	for i, v := range args {
-		if i%2 == 1 {
+		if i%2 == 0 {
 			key = fmt.Sprint(v)
 		} else {
 			value := fmt.Sprint(v)

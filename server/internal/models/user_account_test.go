@@ -4,16 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/test"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
-
-var uatcfg = config.Config{
-	PqUser:   "penguin",
-	PqSecret: "postgres",
-	RdSecret: "redis",
-}
 
 var uatTableU = []User{
 	{
@@ -41,16 +34,22 @@ func TestUserSetAndQuery(t *testing.T) {
 	client := initMainDb(modelscfg, logger, pqOpt{
 		Addr: "localhost:5432", MaxConn: 5,
 	})
-	userDb := &UserDb{logger, client, nil}
+	redis := initRedis(modelscfg, logger, redisOpt{
+		Addr:    "localhost:6738",
+		Db:      0,
+		MaxConn: 10,
+	})
+	cacheDb := &CacheDb{logger, redis}
+	userDb := &UserDb{logger, client, cacheDb}
 	t.Cleanup(func() {
 		for _, v := range uatTableU {
 			client.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
+			redis.GetDel(defaultCtx, "user:"+v.Username.String())
 		}
 	})
 
 	input := uatTableU[0]
 	t.Run("Set", func(t *testing.T) {
-		input.Date = time.Now()
 		input.Keys.Pub, input.Keys.Pri = utils.NewKeyPair()
 		err := userDb.SetUser(&input)
 		test.AssertNoError(t, err, "Error when set: %+v")
@@ -59,11 +58,16 @@ func TestUserSetAndQuery(t *testing.T) {
 	t.Run("Query", func(t *testing.T) {
 		got, err := userDb.QueryUser(input.Username.Username)
 		test.AssertNoError(t, err, "Error when query: %+v")
+		want := User{
+			Username: input.Username, Nickname: input.Nickname,
+			Summary: input.Summary, Avatar: input.Avatar,
+		}
+		test.AssertEqual(t, want, got)
 
-		t.Logf("\ninput: %+v\ngot: %+v\n", input, got)
-
-		_, _, err = userDb.QueryUserKeys(input.Username.Username)
+		pub, pri, err := userDb.QueryUserKeys(input.Username.Username)
 		test.AssertNoError(t, err, "Error when query keys: %+v")
+		test.AssertEqual(t, input.Keys.Pub, pub)
+		test.AssertEqual(t, input.Keys.Pri, pri)
 	})
 }
 
@@ -72,10 +76,17 @@ func TestUserUpdate(t *testing.T) {
 	client := initMainDb(modelscfg, logger, pqOpt{
 		Addr: "localhost:5432", MaxConn: 5,
 	})
-	userDb := &UserDb{logger, client, nil}
+	redis := initRedis(modelscfg, logger, redisOpt{
+		Addr:    "localhost:6738",
+		Db:      0,
+		MaxConn: 10,
+	})
+	cacheDb := &CacheDb{logger, redis}
+	userDb := &UserDb{logger, client, cacheDb}
 	t.Cleanup(func() {
 		for _, v := range uatTableU {
 			client.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
+			redis.GetDel(defaultCtx, "user:"+v.Username.String())
 		}
 	})
 
@@ -89,43 +100,66 @@ func TestUserUpdate(t *testing.T) {
 		input := uatTableU[1]
 		err := userDb.UpdateUser(&input)
 		test.AssertNoError(t, err, "Error when update: %+v")
+		time.Sleep(500 * time.Millisecond)
 
 		got, err := userDb.QueryUser(input.Username.Username)
 		test.AssertNoError(t, err, "Error when query: %+v")
-		t.Logf("\ninput: %+v\ngot: %+v\n", input, got)
+		want := User{
+			Username: input.Username, Nickname: input.Nickname,
+			Summary: input.Summary, Avatar: input.Avatar,
+		}
+		test.AssertEqual(t, want, got)
+
+		input = uatTableU[0]
+		err = userDb.UpdateUser(&input)
+		test.AssertNoError(t, err, "Error when update: %+v")
+		time.Sleep(500 * time.Millisecond)
+
+		got, err = userDb.QueryUser(input.Username.Username)
+		test.AssertNoError(t, err, "Error when query: %+v")
+		want = User{
+			Username: input.Username, Nickname: input.Nickname,
+			Summary: input.Summary, Avatar: input.Avatar,
+		}
+		test.AssertEqual(t, want, got)
 	})
 }
 
-func TestPreferenceUpdate(t *testing.T) {
+func TestUserPreferenceUpdate(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 	client := initMainDb(modelscfg, logger, pqOpt{
 		Addr: "localhost:5432", MaxConn: 5,
 	})
-	userDb := &UserDb{logger, client, nil}
+	redis := initRedis(modelscfg, logger, redisOpt{
+		Addr:    "localhost:6738",
+		Db:      0,
+		MaxConn: 10,
+	})
+	cacheDb := &CacheDb{logger, redis}
+	userDb := &UserDb{logger, client, cacheDb}
 	t.Cleanup(func() {
 		for _, v := range uatTableU {
 			client.Exec(`DELETE FROM users WHERE "username" = $1;`, v.Username)
+			redis.GetDel(defaultCtx, "user:"+v.Username.String())
 		}
 	})
 
 	inputU := uatTableU[0]
 	input := uatTablePf[1]
-	var before *Preferences
-	t.Run("Set", func(t *testing.T) {
+	t.Run("set and query", func(t *testing.T) {
 		err := userDb.SetUser(&inputU)
 		test.AssertNoError(t, err, "Error when set user: %+v")
-		before, err = userDb.QueryUserPreferences(inputU.Username.Username)
+		before, err := userDb.QueryUserPreferences(inputU.Username.Username)
+		want := uatTablePf[0]
+		test.AssertEqual(t, want, *before)
 		test.AssertNoError(t, err, "Error when query before: %+v")
 	})
 
-	t.Run("Update", func(t *testing.T) {
+	t.Run("update", func(t *testing.T) {
 		err := userDb.UpdateUserPreferences(inputU.Username.Username, &input)
 		test.AssertNoError(t, err, "Error when update: %+v")
-	})
-
-	t.Run("Query", func(t *testing.T) {
 		after, err := userDb.QueryUserPreferences(inputU.Username.Username)
 		test.AssertNoError(t, err, "Error when query after: %+v")
-		t.Logf("\ninput: %+v\nbefore: %+v\nafter: %+v", input, before, after)
+		test.AssertEqual(t, input, *after)
 	})
 }

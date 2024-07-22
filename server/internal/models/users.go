@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/utils"
@@ -16,18 +15,17 @@ import (
 // models
 
 type User struct {
-	Username    UD          `json:"username,omitempty"`
-	Nickname    string      `json:"nickname,omitempty"`
-	Summary     string      `json:"summary,omitempty"`
-	Avatar      Img         `json:"avatar,omitempty"`
-	Date        time.Time   `json:"date,omitempty"`
+	Username    UD          `json:"username"`
+	Nickname    string      `json:"nickname"`
+	Summary     string      `json:"summary"`
+	Avatar      Img         `json:"avatar"`
 	Keys        KeyPair     `json:"keys,omitempty"`
 	Preferences Preferences `json:"preferences,omitempty"`
 }
 
 type UD struct {
-	Username string
-	Domain   string
+	Username string `json:"username,omitempty"`
+	Domain   string `json:"domain,omitempty"`
 }
 
 func NewUD(user string) UD {
@@ -76,8 +74,8 @@ func (ud *UD) Scan(src interface{}) error {
 }
 
 type KeyPair struct {
-	Pub string `json:"pub"`
-	Pri string `json:"pri"`
+	Pub string `json:"pub,omitempty"`
+	Pri string `json:"pri,omitempty"`
 }
 
 // implement database/sql/driver.Valuer
@@ -103,8 +101,8 @@ func (kp *KeyPair) Scan(src interface{}) error {
 }
 
 type Preferences struct {
-	PostVsb  string `json:"postVsb"`
-	ShareVsb string `json:"shareVsb"`
+	PostVsb  string `json:"postVsb,omitempty"`
+	ShareVsb string `json:"shareVsb,omitempty"`
 }
 
 // implement database/sql/driver.Valuer

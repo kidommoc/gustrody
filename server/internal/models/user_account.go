@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql"
-	"time"
 )
 
 type IUserAccount interface {
@@ -15,11 +14,10 @@ type IUserAccount interface {
 
 func (db *UserDb) SetUser(user *User) error {
 	logger := db.lg
-	qs := ` INSERT INTO users("username", "nickname", "summary", "createdAt", "avatar", "keys")
-			VALUES ($1, $2, '', $3, '', $4);`
+	qs := ` INSERT INTO users("username", "nickname", "summary", "avatar", "keys")
+			VALUES ($1, $2, '', '', $3);`
 	r, err := sqlExec(db.client.Exec(qs,
-		user.Username, user.Nickname,
-		time.Now().UTC(), user.Keys,
+		user.Username, user.Nickname, user.Keys,
 	))
 	if err != nil {
 		logger.Error("[Model.UserAccount] Failed to execute", err)

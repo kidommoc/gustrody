@@ -10,7 +10,7 @@ import (
 func (service *PostService) GetLikes(user, postID string) (list []*users.UserInfo, err error) {
 	logger := service.lg
 
-	post, err := service.db.Query.QueryPostByID(postID)
+	post, err := service.db.Query.QueryPost(postID)
 	switch err {
 	case models.ErrNotFound:
 		return nil, ErrPostNotFound

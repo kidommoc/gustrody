@@ -12,14 +12,14 @@ DROP TYPE img;
 
 -- users
 
-INSERT INTO users("username", "nickname", "createdAt", "summary")
-VALUES ('u1', 'User 1', NOW(), 'I am u1.');
+INSERT INTO users("username", "nickname", "summary")
+VALUES ('u1', 'User 1', 'I am u1.');
 
-INSERT INTO users("username", "nickname", "createdAt", "summary")
-VALUES ('u2', 'User 2', NOW(), 'I am u2.');
+INSERT INTO users("username", "nickname", "summary")
+VALUES ('u2', 'User 2', 'I am u2.');
 
-INSERT INTO users("username", "nickname", "createdAt", "summary")
-VALUES ('u3', 'User 3', NOW(), 'I am u3.');
+INSERT INTO users("username", "nickname", "summary")
+VALUES ('u3', 'User 3', 'I am u3.');
 
 -- follow
 

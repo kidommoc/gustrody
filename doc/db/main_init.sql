@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS users (
   "username" varchar(20) PRIMARY KEY,
   "nickname" text NOT NULL,
   "summary" text,
-  "createdAt" timestamp NOT NULL,
   "avatar" text,
   "keys" kp, -- NOT NULL
   "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'

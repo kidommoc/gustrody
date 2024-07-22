@@ -34,15 +34,21 @@ func TestLike(t *testing.T) {
 	client := initMainDb(modelscfg, logger, pqOpt{
 		Addr: "localhost:5432", MaxConn: 5,
 	})
-	postDb := &PostDb{logger, client, nil}
+	redis := initRedis(modelscfg, logger, redisOpt{
+		Addr:    "localhost:6738",
+		Db:      0,
+		MaxConn: 10,
+	})
+	cacheDb := &CacheDb{logger, redis}
+	postDb := &PostDb{logger, client, cacheDb}
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
 			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			redis.GetDel(defaultCtx, "post:"+v.input.ID)
 		}
 	})
 
-	inputP := pqstTable[0].input
-	postDb.SetPost(&inputP.Post, inputP.Imgs)
+	postDb.SetPost(&pqstTable[0].input)
 
 	t.Run("Like 1", func(t *testing.T) {
 		input := plstTable[0].input
@@ -101,19 +107,26 @@ func TestShare(t *testing.T) {
 	client := initMainDb(modelscfg, logger, pqOpt{
 		Addr: "localhost:5432", MaxConn: 5,
 	})
-	postDb := &PostDb{logger, client, nil}
+	redis := initRedis(modelscfg, logger, redisOpt{
+		Addr:    "localhost:6738",
+		Db:      0,
+		MaxConn: 10,
+	})
+	cacheDb := &CacheDb{logger, redis}
+	postDb := &PostDb{logger, client, cacheDb}
 	t.Cleanup(func() {
 		for _, v := range plstTable {
 			client.Exec(`DELETE FROM shares WHERE "user" = $1 AND "id" = $2;`, v.input.actor, v.input.target)
+			redis.GetDel(defaultCtx, "user:"+v.input.actor.String())
 		}
 		for _, v := range pqstTable {
 			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
+			redis.GetDel(defaultCtx, "post:"+v.input.ID)
 		}
 	})
 	d := time.Now()
 
-	inputP := pqstTable[0].input
-	postDb.SetPost(&inputP.Post, inputP.Imgs)
+	postDb.SetPost(&pqstTable[0].input)
 
 	t.Run("Share 1", func(t *testing.T) {
 		input := plstTable[0].input

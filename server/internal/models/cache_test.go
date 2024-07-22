@@ -32,7 +32,7 @@ func TestCacheString(t *testing.T) {
 
 	t.Run("Test Set", func(t *testing.T) {
 		for k, v := range table {
-			err := cacheDb.CacheSetString(k, v)
+			err := cacheDb.CacheSetString(k, v, false)
 			test.AssertNoError(t, err, "when set string: %s")
 			exp, err := client.ExpireTime(defaultCtx, k).Result()
 			test.AssertNoError(t, err, "when get expire time: %s")
@@ -119,7 +119,7 @@ func TestCacheJson(t *testing.T) {
 		for k, v := range table {
 			if strings.Contains(k, "cache") {
 				s, _ := json.Marshal(v.old["j"])
-				err := cacheDb.CacheSetString(k, string(s))
+				err := cacheDb.CacheSetString(k, string(s), false)
 				test.AssertNoError(t, err, "when set string: %s")
 				err = cacheDb.CacheUpdateJson(k, v.input)
 				test.AssertNoError(t, err, "when update json: %s")
@@ -143,57 +143,162 @@ func TestCachePage(t *testing.T) {
 	})
 	cacheDb := &CacheDb{logger, client}
 
-	key := "pages"
 	d := time.Now().UTC()
-	table := [][]PageItem{
-		{PageItem{"1-1", d}, PageItem{"1-2", d}, PageItem{"1-3", d}},
-		{PageItem{"2-1", d}, PageItem{"2-2", d}, PageItem{"2-3", d}},
-		{PageItem{"3-1", d}, PageItem{"3-2", d}, PageItem{"3-3", d}},
+	acseKey := "acse"
+	acseTable := [][]PageItem{}
+	for i := 0; i < 3; i++ {
+		page := make([]PageItem, 0, 20)
+		for j := 0; j < 20; j++ {
+			page = append(page, PageItem{
+				ID:   fmt.Sprintf("%d-%d", i+1, j+1),
+				Date: d.Add(time.Duration(i*20+j) * time.Minute),
+			})
+		}
+		acseTable = append(acseTable, page)
+	}
+	decsKey := "decs"
+	decsTable := [][]PageItem{}
+	for i := 0; i < 3; i++ {
+		page := make([]PageItem, 0, 20)
+		for j := 0; j < 20; j++ {
+			page = append(page, PageItem{
+				ID:   fmt.Sprintf("%d-%d", i+1, j+1),
+				Date: d.Add(-1 * time.Duration(i*20+j) * time.Minute),
+			})
+		}
+		decsTable = append(decsTable, page)
 	}
 
-	t.Cleanup(func() { client.LTrim(defaultCtx, key, 1, 0) })
-
-	t.Run("Test push page", func(t *testing.T) {
-		want := make([]string, 0, len(table))
-		for _, v := range table {
-			err := cacheDb.CachePushPage(key, v)
-			test.AssertNoError(t, err, "when push page: %s")
-			s, _ := json.Marshal(v)
-			want = append(want, string(s))
-		}
-		got, _ := client.LRange(defaultCtx, key, 0, -1).Result()
-		test.AssertEqual(t, want, got)
+	t.Cleanup(func() {
+		client.LTrim(defaultCtx, acseKey, 1, 0)
+		client.LTrim(defaultCtx, decsKey, 1, 0)
 	})
 
-	t.Run("Test query page", func(t *testing.T) {
-		for i, v := range table {
-			got, err := cacheDb.CacheQueryPage(key, i+1)
+	t.Run("Test push page acse", func(t *testing.T) {
+		want := make([]string, 0, len(acseTable))
+		err := cacheDb.CachePushPages(acseKey, acseTable, false)
+		test.AssertNoError(t, err, "when push pages: %s")
+		idx := make([]time.Time, 0, len(acseTable))
+		for _, v := range acseTable {
+			s, _ := json.Marshal(v)
+			want = append(want, string(s))
+			idx = append(idx, v[0].Date)
+		}
+		got, _ := client.LRange(defaultCtx, acseKey, 1, -1).Result()
+		test.AssertEqual(t, want, got)
+
+		wantIdx, _ := json.Marshal(idx)
+		gotIdx, _ := client.LIndex(defaultCtx, acseKey, 0).Result()
+		test.AssertEqual(t, string(wantIdx), gotIdx)
+	})
+
+	t.Run("Test push page decs", func(t *testing.T) {
+		want := make([]string, 0, len(decsTable))
+		err := cacheDb.CachePushPages(decsKey, decsTable, false)
+		test.AssertNoError(t, err, "when push pages: %s")
+		idx := make([]time.Time, 0, len(decsTable))
+		for _, v := range decsTable {
+			s, _ := json.Marshal(v)
+			want = append(want, string(s))
+			idx = append(idx, v[0].Date)
+		}
+		got, _ := client.LRange(defaultCtx, decsKey, 1, -1).Result()
+		test.AssertEqual(t, want, got)
+
+		wantIdx, _ := json.Marshal(idx)
+		gotIdx, _ := client.LIndex(defaultCtx, decsKey, 0).Result()
+		test.AssertEqual(t, string(wantIdx), gotIdx)
+	})
+
+	t.Run("Test query page acse", func(t *testing.T) {
+		for i, v := range acseTable {
+			got, err := cacheDb.CacheQueryPage(acseKey, i+1)
 			test.AssertNoError(t, err, fmt.Sprintf("when query page %d: ", i)+"%s")
 			test.AssertEqual(t, v, got)
 		}
 	})
 
-	t.Run("Test pop page", func(t *testing.T) {
-		got, err := cacheDb.CachePopPage(key)
-		test.AssertNoError(t, err, "when pop page 1: %s")
-		want := table[0]
-		test.AssertEqual(t, want, got)
+	t.Run("Test query page decs", func(t *testing.T) {
+		for i, v := range decsTable {
+			got, err := cacheDb.CacheQueryPage(decsKey, i+1)
+			test.AssertNoError(t, err, fmt.Sprintf("when query page %d: ", i)+"%s")
+			test.AssertEqual(t, v, got)
+		}
 	})
 
-	t.Run("Test remove item", func(t *testing.T) {
-		err := cacheDb.CacheRemoveItem(key, "2-1")
-		test.AssertNoError(t, err, "when remove item 2-1: %s")
-		got, err := cacheDb.CachePopPage(key)
-		test.AssertNoError(t, err, "when pop page 2: %s")
-		want := table[1][1:]
+	t.Run("Test query page by date acse", func(t *testing.T) {
+		d1 := d.Add(3 * time.Minute) // from 5th item of 1st page
+		got, err := cacheDb.CacheQueryPageByDate(acseKey, d1, true)
+		test.AssertNoError(t, err, "when query 1: %s")
+		want := acseTable[0][4:]
 		test.AssertEqual(t, want, got)
 
-		// remove non-existent item
-		err = cacheDb.CacheRemoveItem(key, "3-4")
-		test.AssertNoError(t, err, "when remove item 3-4: %s")
-		got, err = cacheDb.CachePopPage(key)
-		test.AssertNoError(t, err, "when pop page 3: %s")
-		want = table[2]
+		d2 := d.Add(time.Duration(1*20+12) * time.Minute) // from 14th item of 2nd page
+		got, err = cacheDb.CacheQueryPageByDate(acseKey, d2, true)
+		test.AssertNoError(t, err, "when query 2: %s")
+		want = append(acseTable[1][13:], acseTable[2]...)
 		test.AssertEqual(t, want, got)
+
+		d3 := d.Add(time.Duration(2*20+1) * time.Minute) // from 3rd item of 3rd page
+		got, err = cacheDb.CacheQueryPageByDate(acseKey, d3, true)
+		test.AssertEqual(t, err, ErrNoEnoughPages)
+		want = acseTable[2][2:]
+		test.AssertEqual(t, want, got)
+
+		d4 := d.Add(time.Duration(4*20) * time.Minute) // very late
+		got, err = cacheDb.CacheQueryPageByDate(acseKey, d4, true)
+		test.AssertEqual(t, err, ErrNoEnoughPages)
+		test.AssertEqual(t, []PageItem{}, got)
 	})
+
+	t.Run("Test query page by date decs", func(t *testing.T) {
+		d1 := d.Add(-3 * time.Minute) // from 5th item of 1st page
+		got, err := cacheDb.CacheQueryPageByDate(decsKey, d1, false)
+		test.AssertNoError(t, err, "when query 1: %s")
+		want := decsTable[0][4:]
+		test.AssertEqual(t, want, got)
+
+		d2 := d.Add(-1 * time.Duration(1*20+12) * time.Minute) // from 14th item of 2nd page
+		got, err = cacheDb.CacheQueryPageByDate(decsKey, d2, false)
+		test.AssertNoError(t, err, "when query 2: %s")
+		want = append(decsTable[1][13:], decsTable[2]...)
+		test.AssertEqual(t, want, got)
+
+		d3 := d.Add(-1 * time.Duration(2*20+1) * time.Minute) // from 3rd item of 3rd page
+		got, err = cacheDb.CacheQueryPageByDate(decsKey, d3, false)
+		test.AssertEqual(t, err, ErrNoEnoughPages)
+		want = decsTable[2][2:]
+		test.AssertEqual(t, want, got)
+
+		d4 := d.Add(-1 * time.Duration(4*20) * time.Minute) // very late
+		got, err = cacheDb.CacheQueryPageByDate(decsKey, d4, false)
+		test.AssertEqual(t, err, ErrNoEnoughPages)
+		test.AssertEqual(t, []PageItem{}, got)
+	})
+
+	/*
+		t.Run("Test pop page", func(t *testing.T) {
+			got, err := cacheDb.CachePopPage(key)
+			test.AssertNoError(t, err, "when pop page 1: %s")
+			want := table[0]
+			test.AssertEqual(t, want, got)
+		})
+
+		t.Run("Test remove item", func(t *testing.T) {
+			err := cacheDb.CacheRemoveItem(key, "2-1")
+			test.AssertNoError(t, err, "when remove item 2-1: %s")
+			got, err := cacheDb.CachePopPage(key)
+			test.AssertNoError(t, err, "when pop page 2: %s")
+			want := table[1][1:]
+			test.AssertEqual(t, want, got)
+
+			// remove non-existent item
+			err = cacheDb.CacheRemoveItem(key, "3-4")
+			test.AssertNoError(t, err, "when remove item 3-4: %s")
+			got, err = cacheDb.CachePopPage(key)
+			test.AssertNoError(t, err, "when pop page 3: %s")
+			want = table[2]
+			test.AssertEqual(t, want, got)
+		})
+	*/
 }

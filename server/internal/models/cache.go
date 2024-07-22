@@ -55,12 +55,29 @@ func (db *CacheDb) CacheQueryString(key []string) (kv map[string]string, err err
 	return kv, nil
 }
 
-func (db *CacheDb) CacheSetString(key string, value string) error {
+// nx: only set when not exist
+func (db *CacheDb) CacheSetString(key string, value string, nx bool) error {
 	logger := db.lg
-	_, err := db.client.Set(defaultCtx, key, value, cacheExpires).Result()
+	var err error
+	if nx {
+		_, err = db.client.SetNX(defaultCtx, key, value, cacheExpires).Result()
+	} else {
+		_, err = db.client.Set(defaultCtx, key, value, cacheExpires).Result()
+	}
 	if err != nil {
-		msg := fmt.Sprintf(`[Models.CacheQueryString] Cannot set string: "%s":"%s"`, key, value)
-		logger.Error(msg, err)
+		msg := fmt.Sprintf(`[Models.CacheSetString] Cannot set string: "%s"`, key)
+		logger.Warning(msg, err)
+		return ErrDbInternal
+	}
+	return nil
+}
+
+func (db *CacheDb) CacheRemoveString(key string) error {
+	logger := db.lg
+	_, err := db.client.GetDel(defaultCtx, key).Result()
+	if err != nil {
+		msg := fmt.Sprintf(`[Models.CacheRemoveString] Cannot remove string: "%s"`, key)
+		logger.Warning(msg, err)
 		return ErrDbInternal
 	}
 	return nil
@@ -69,13 +86,13 @@ func (db *CacheDb) CacheSetString(key string, value string) error {
 func (db *CacheDb) warnJsonMarshal(loc, varname string, err error) error {
 	msg := fmt.Sprintf(`[Models.%s] Failed to marshal "%s" to json.`, loc, varname)
 	db.lg.Warning(msg, "error", err)
-	return ErrSyntax
+	return ErrFormat
 }
 
 func (db *CacheDb) warnJsonUnmarshal(loc, varname string, err error) error {
 	msg := fmt.Sprintf(`[Models.%s] Failed to unmarshal "%s" to json.`, loc, varname)
 	db.lg.Warning(msg, "error", err)
-	return ErrSyntax
+	return ErrFormat
 }
 
 // use a string of 16 chars to mark a field to clear.
@@ -94,7 +111,7 @@ func (db *CacheDb) updateJson(om, nm *map[string]interface{}) error {
 		if !nt.ConvertibleTo(t) {
 			msg := fmt.Sprintf("[Models.updateJson] %s: %s is not convertable to %s", k, nt.Name(), t.Name())
 			logger.Warning(msg)
-			return ErrSyntax
+			return ErrFormat
 		}
 		switch t.Kind() {
 		case reflect.Slice:
@@ -120,7 +137,7 @@ func (db *CacheDb) updateJson(om, nm *map[string]interface{}) error {
 		case reflect.Map:
 			if t.Key().Kind() != reflect.String {
 				logger.Warning(`[Models.CacheUpdateJson] Unsupported map as "om.%s"`, k)
-				return ErrSyntax
+				return ErrFormat
 			}
 			oo, _ := o.(map[string]interface{})
 			nn, _ := n.(map[string]interface{})
@@ -131,7 +148,6 @@ func (db *CacheDb) updateJson(om, nm *map[string]interface{}) error {
 		default:
 			switch o.(type) {
 			case string:
-				logger.Debug("")
 				nn := reflect.ValueOf(n).String()
 				if nn == stringClearFlag {
 					(*om)[k] = ""
@@ -153,8 +169,8 @@ func (db *CacheDb) updateJson(om, nm *map[string]interface{}) error {
 // value must be a map[string] or a struct. update rule:
 //
 //   - number: old + new
-//   - bool: old = new. Note that bool field MUST NOT be omitempty.
-//   - slice: old = new. Note that slice field MUST NOT be omitempty and MUST NOT be nil.
+//   - bool: old = new. Bool field MUST NOT be omitempty, otherwise false value will be omitted.
+//   - slice: old = new. Slice field MUST NOT be omitempty (empty slice will be omitted) and MUST NOT be nil.
 //   - string: if new == stringClearFlag old = "" else old = new
 //   - struct: recursively update. As struct filed, it could be a pointer. But as map entry it MUST NOT be a pointer.
 func (db *CacheDb) CacheUpdateJson(key string, value interface{}) error {
@@ -166,7 +182,7 @@ func (db *CacheDb) CacheUpdateJson(key string, value interface{}) error {
 		n, ok := value.(map[string]interface{})
 		if !ok {
 			logger.Warning(`[Models.CacheUpdateJson] Unsupported map as "value": %s`, reflect.TypeOf(value).Name())
-			return ErrSyntax
+			return ErrFormat
 		}
 		nm = n
 	case reflect.Struct:
@@ -177,7 +193,7 @@ func (db *CacheDb) CacheUpdateJson(key string, value interface{}) error {
 		json.Unmarshal(s, &nm)
 	default:
 		logger.Warning(`[Models.CacheUpdateJson] Unsupported type as "value": %s`, reflect.TypeOf(value).Name())
-		return ErrSyntax
+		return ErrFormat
 	}
 
 	for i := 0; i < redisMaxRetries; i += 1 {
@@ -205,7 +221,7 @@ func (db *CacheDb) CacheUpdateJson(key string, value interface{}) error {
 				logger.Warning("[Models.CacheUpdateJson] Json struct not match.",
 					"key", key, "error", err,
 				)
-				return ErrSyntax
+				return ErrFormat
 			}
 			s, _ := json.Marshal(om)
 			tx.Set(defaultCtx, key, string(s), redis.KeepTTL)
@@ -224,10 +240,10 @@ type PageItem struct {
 	Date time.Time `json:"date"`
 }
 
-// n: indexed from 1
+// n: indexed from 1. negative n indicates the n-th page counted from the tail.
 func (db *CacheDb) CacheQueryPage(key string, n int) (page []PageItem, err error) {
 	logger := db.lg
-	s, err := db.client.LIndex(defaultCtx, key, int64(n-1)).Result()
+	s, err := db.client.LIndex(defaultCtx, key, int64(n)).Result()
 	switch err {
 	case redis.Nil:
 		return nil, ErrNotFound
@@ -241,16 +257,101 @@ func (db *CacheDb) CacheQueryPage(key string, n int) (page []PageItem, err error
 	if err != nil {
 		msg := fmt.Sprintf("[Models.CachePopPage] Not page: %s", key)
 		logger.Error(msg, nil)
-		return nil, ErrSyntax
+		return nil, ErrFormat
 	}
 	return page, nil
 }
 
-func (db *CacheDb) CacheRemoveItem(key string, id string) error {
+// acse == true: assume that items are ordered by date ascendingly and query a page by min date (not included)
+//
+// acse == false: assume that items are ordered by date decsendingly and query a page by max date (not included)
+func (db *CacheDb) CacheQueryPageByDate(key string, date time.Time, acse bool) (page []PageItem, err error) {
 	logger := db.lg
 	for i := 0; i < redisMaxRetries; i += 1 {
 		if err := db.client.Watch(defaultCtx, func(tx *redis.Tx) error {
-			ss, err := tx.LRange(defaultCtx, key, 0, -1).Result()
+			// get index page
+			s, err := tx.LIndex(defaultCtx, key, 0).Result()
+			switch err {
+			case nil:
+			case redis.Nil:
+				msg := fmt.Sprintf("[Models.CacheQueryPageByDate] Pages not found: %s", key)
+				logger.Error(msg, err)
+				return ErrDbInternal
+			default:
+				msg := fmt.Sprintf("[Models.CacheQueryPageByDate] Failed to query index page: %s", key)
+				logger.Error(msg, err)
+				return ErrDbInternal
+			}
+
+			var idx []time.Time
+			if err := json.Unmarshal([]byte(s), &idx); err != nil {
+				return db.warnJsonUnmarshal("CacheQueryPageByDate", "idx", err)
+			}
+
+			// get pages (1 or 2)
+			pos := 0
+			du := date.Unix()
+			for ; pos < len(idx); pos += 1 {
+				if acse && idx[pos].Unix() > du || !acse && idx[pos].Unix() < du {
+					break
+				}
+			}
+			ss, err := tx.LRange(defaultCtx, key, int64(pos), int64(pos+1)).Result()
+			if err != nil {
+				msg := fmt.Sprintf("[Models.CacheQueryPageByDate] Failed to query pages of %s: p%d to p%d", key, pos, pos+1)
+				logger.Error(msg, err)
+				return ErrDbInternal
+			}
+			if len(ss) == 0 {
+				// cache corrupted. clear cache
+				logger.Warning("[Models.CacheQueryPageByDate] Cache corrupted.", "key", key)
+				tx.LTrim(defaultCtx, key, 1, 0)
+				return ErrNotFound
+			}
+
+			var page1 []PageItem
+			var page2 []PageItem
+			if err := json.Unmarshal([]byte(ss[0]), &page1); err != nil {
+				return db.warnJsonUnmarshal("CacheQueryPageByDate", "page1", err)
+			}
+			err = nil
+			if len(ss) < 2 {
+				err = ErrNoEnoughPages
+			} else {
+				if err := json.Unmarshal([]byte(ss[1]), &page2); err != nil {
+					return db.warnJsonUnmarshal("CacheQueryPageByDate", "page2", err)
+				}
+			}
+
+			// find where target page starts
+			start := 0
+			for ; start < len(page1); start += 1 {
+				if acse && page1[start].Date.Unix() > du || !acse && page1[start].Date.Unix() < du {
+					break
+				}
+			}
+			page = page1[start:]
+			if len(page) < redisPageSize/2 {
+				page = append(page, page2...)
+			}
+			return err
+		}, key); err == nil {
+			return page, nil
+		} else if err == redis.TxFailedErr {
+			continue
+		} else {
+			return page, err
+		}
+	}
+	return nil, ErrMaxRetries
+}
+
+/*
+func (db *CacheDb) CacheRemoveItems(key string, ids []string) error {
+	logger := db.lg
+	for i := 0; i < redisMaxRetries; i += 1 {
+		if err := db.client.Watch(defaultCtx, func(tx *redis.Tx) error {
+			ss, err := tx.LRange(defaultCtx, key, 1, -1).Result()
 			if err != nil {
 				logger.Warning("[Models.CachePopPage] Cannot query.",
 					"key", key, "error", err,
@@ -268,10 +369,10 @@ func (db *CacheDb) CacheRemoveItem(key string, id string) error {
 					logger.Warning("[Models.CachePopPage] Not a page.",
 						"key", key, "error", err,
 					)
-					return ErrSyntax
+					return ErrFormat
 				}
 				for i, item := range page {
-					if item.ID == id {
+					if slices.Contains(ids, item.ID) {
 						var after []PageItem
 						if i < len(page) {
 							after = page[i+1:]
@@ -284,7 +385,9 @@ func (db *CacheDb) CacheRemoveItem(key string, id string) error {
 				}
 			}
 			return nil
-		}, key); err == redis.TxFailedErr {
+		}, key); err == nil {
+			return nil
+		} else if err == redis.TxFailedErr {
 			continue
 		} else {
 			return err
@@ -292,7 +395,9 @@ func (db *CacheDb) CacheRemoveItem(key string, id string) error {
 	}
 	return ErrMaxRetries
 }
+*/
 
+/*
 func (db *CacheDb) CachePopPage(key string) (page []PageItem, err error) {
 	logger := db.lg
 	s, err := db.client.LPop(defaultCtx, key).Result()
@@ -309,20 +414,92 @@ func (db *CacheDb) CachePopPage(key string) (page []PageItem, err error) {
 	if err != nil {
 		msg := fmt.Sprintf("[Models.CachePopPage] Not page: %s", key)
 		logger.Error(msg, err)
-		return nil, ErrSyntax
+		return nil, ErrFormat
 	}
 	return page, nil
 }
+*/
 
-func (db *CacheDb) CachePushPage(key string, page []PageItem) error {
+// will not check whether items in pages are sorted acsending / decsending
+func (db *CacheDb) CachePushPages(key string, pages [][]PageItem, acse bool) error {
 	logger := db.lg
-	s, _ := json.Marshal(page)
-	_, err := db.client.RPush(defaultCtx, key, s).Result()
-	if err != nil {
-		logger.Warning("[Models.CachePushPage] Failed to push page.",
-			"key", key, "error", err,
-		)
-		return err
+	if len(pages) == 0 || len(pages[0]) == 0 {
+		return nil
 	}
-	return nil
+
+	for i := 0; i < redisMaxRetries; i += 1 {
+		if err := db.client.Watch(defaultCtx, func(tx *redis.Tx) error {
+			// get and set index page
+			s, err := tx.LIndex(defaultCtx, key, 0).Result()
+			switch err {
+			case nil:
+				var idx []time.Time
+				if err = json.Unmarshal([]byte(s), &idx); err != nil {
+					return db.warnJsonUnmarshal("CachePushPage", "idx", err)
+				}
+
+				// check index page to ensure acsending or desending
+				du := pages[0][0].Date.Unix()
+				if acse && idx[len(idx)-1].Unix() >= du || !acse && idx[len(idx)-1].Unix() <= du {
+					logger.Warning("[CachePushPage] Order inconsistent when push pages.", "key", key)
+					return ErrInconsistent
+				}
+
+				for _, page := range pages {
+					idx = append(idx, page[0].Date)
+				}
+				s, _ := json.Marshal(idx)
+				_, err = tx.LSet(defaultCtx, key, 0, s).Result()
+				if err != nil {
+					logger.Warning("[Models.CachePushPage] Failed to set index page.",
+						"key", key, "error", err,
+					)
+					return err
+				}
+			case redis.Nil:
+				// index page not found (key-value inexsitent yet)
+				idx := make([]time.Time, 0, len(pages))
+				for _, page := range pages {
+					idx = append(idx, page[0].Date)
+				}
+				s, _ := json.Marshal(idx)
+				_, err = tx.RPush(defaultCtx, key, s).Result()
+				if err != nil {
+					logger.Warning("[Models.CachePushPage] Failed to push index page.",
+						"key", key, "error", err,
+					)
+					return err
+				}
+			default:
+				logger.Warning("[Models.CachePushPage] Failed to query index page.",
+					"key", key, "error", err,
+				)
+				return err
+			}
+
+			ps := make([]interface{}, 0, len(pages))
+			for _, page := range pages {
+				if len(page) == 0 {
+					continue
+				}
+				s, _ := json.Marshal(page)
+				ps = append(ps, string(s))
+			}
+			_, err = tx.RPush(defaultCtx, key, ps...).Result()
+			if err != nil {
+				logger.Warning("[Models.CachePushPage] Failed to push page.",
+					"key", key, "error", err,
+				)
+				return err
+			}
+			return nil
+		}, key); err == nil {
+			return nil
+		} else if err == redis.TxFailedErr {
+			continue
+		} else {
+			return err
+		}
+	}
+	return ErrMaxRetries
 }
