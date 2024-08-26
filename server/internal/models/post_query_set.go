@@ -61,6 +61,10 @@ func (db *PostDb) QueryPost(id string) (post Post, err error) {
 			err = json.Unmarshal([]byte(ss[cacheKey]), &post)
 			if err == nil {
 				// use cache
+				if post.Tombstone {
+					// has been removed
+					return post, ErrNotFound
+				}
 				return post, nil
 			} else {
 				// cache corrupted. clear cache
@@ -222,6 +226,15 @@ func (db *PostDb) QueryPostReplies(id string) (replyings []Post, replies []Post,
 		p.Vsb, _ = utils.GetVsb(vsb)
 		replies = append(replies, p)
 	}
+
+	go func(list []Post) {
+		for _, v := range list {
+			s, err := json.Marshal(v)
+			if err == nil {
+				db.cache.SetString("post:"+v.ID, string(s), true)
+			}
+		}
+	}(append(replyings, replies...))
 
 	return replyings, replies, nil
 }
@@ -496,6 +509,9 @@ func (db *PostDb) QueryUserContent(user string, maxDate time.Time) (list []Post,
 			list := make([]Post, 0, len(cache))
 			for _, v := range idx {
 				p := m[v.ID]
+				if p.Tombstone {
+					continue
+				}
 				if v.Type == "share" {
 					p.Replying = ""
 					p.ReplyTo = UD{}
@@ -619,7 +635,9 @@ func (db *PostDb) RemovePost(id string) error {
 		return ErrNotFound
 	}
 
-	// cache
-	go db.cache.RemoveString("post:" + id)
+	// cache. ensure removed successfully
+	if err := db.cache.SetString("post:"+id, `{"tombstone":true}`, false); err != nil {
+		db.cache.RemoveString("post:" + id)
+	}
 	return nil
 }

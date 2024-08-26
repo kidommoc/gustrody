@@ -10,7 +10,6 @@ import (
 
 	"github.com/kidommoc/gustrody/internal/test"
 	"github.com/kidommoc/gustrody/internal/utils"
-	_redis "github.com/redis/go-redis/v9"
 )
 
 var pqstTable = []struct {
@@ -198,8 +197,9 @@ func TestPostRemove(t *testing.T) {
 	test.AssertNoError(t, err, "Error when remove: %s")
 	test.AssertEqual(t, false, postDb.IsPostExist(input.ID))
 	time.Sleep(500 * time.Millisecond)
-	_, err = redis.Get(defaultCtx, "post:"+input.ID).Result()
-	test.AssertEqual(t, err, _redis.Nil)
+	got, err := redis.Get(defaultCtx, "post:"+input.ID).Result()
+	test.AssertNoError(t, err, "when query cache: %s")
+	test.AssertEqual(t, `{"tombstone":true}`, got)
 }
 
 func TestPostUserContent(t *testing.T) {
