@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"regexp"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestLike(t *testing.T) {
 		MaxConn: 10,
 	})
 	cacheDb := &CacheDb{logger, redis}
-	postDb := &PostDb{logger, client, cacheDb}
+	postDb := &PostDb{logger, client, cacheDb, regexp.MustCompile(`(post|share):([0-9a-f]+)`)}
 	t.Cleanup(func() {
 		for _, v := range pqstTable {
 			client.Exec(`DELETE FROM posts WHERE "id" = $1;`, v.input.ID)
@@ -113,7 +114,7 @@ func TestShare(t *testing.T) {
 		MaxConn: 10,
 	})
 	cacheDb := &CacheDb{logger, redis}
-	postDb := &PostDb{logger, client, cacheDb}
+	postDb := &PostDb{logger, client, cacheDb, regexp.MustCompile(`(post|share):([0-9a-f]+)`)}
 	t.Cleanup(func() {
 		for _, v := range plstTable {
 			client.Exec(`DELETE FROM shares WHERE "user" = $1 AND "id" = $2;`, v.input.actor, v.input.target)

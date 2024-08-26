@@ -102,7 +102,7 @@ func (service *PostService) Get(user, postID string) (post *Post, err error) {
 	return &p, nil
 }
 
-func (service *PostService) GetByUser(username, target string) (list []*Post, err error) {
+func (service *PostService) GetByUser(username, target string, maxDate time.Time) (list []*Post, err error) {
 	logger := service.lg
 	user, e := service.user.GetInfo(target)
 	if e != nil {
@@ -121,7 +121,7 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 	if utils.UdReg.MatchString(target) {
 		// may update foreign
 	}
-	posts, e := service.db.Query.QueryPostsAndSharesByUser(target, false) // descending by date
+	posts, e := service.db.Query.QueryUserContent(target, maxDate)
 	if e != nil {
 		logger.Error("[Posts] Error when GetByUser", e)
 		return list, nil
@@ -151,7 +151,7 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 				continue
 			}
 		case utils.Vsb_DIRECT:
-			if !service.checkPermission(username, v) {
+			if !service.checkPermission(username, &v) {
 				continue
 			}
 		}
@@ -159,12 +159,12 @@ func (service *PostService) GetByUser(username, target string) (list []*Post, er
 		if u == nil {
 			continue
 		}
-		p, e := service.makePost(v, u)
+		p, e := service.makePost(&v, u)
 		if e != nil {
 			continue
 		}
-		p.ReplyTo = gu(v.ReplyTo)
-		p.SharedBy = gu(v.SharedBy)
+		p.ReplyTo = gu(v.ReplyTo.String())
+		p.SharedBy = gu(v.SharedBy.String())
 		list = append(list, &p)
 	}
 

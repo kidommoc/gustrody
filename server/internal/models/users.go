@@ -56,6 +56,10 @@ func (ud UD) Value() (driver.Value, error) {
 
 // implement database/sql.Scanner
 func (ud *UD) Scan(src interface{}) error {
+	if src == nil {
+		*ud = NewUD("")
+		return nil
+	}
 	var s string
 	b, ok := src.([]byte)
 	if !ok {

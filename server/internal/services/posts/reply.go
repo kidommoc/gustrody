@@ -78,7 +78,7 @@ func (service *PostService) setReplies(post *Post) error {
 	// replying to. as list
 	rt = rt[1:]
 	for _, v := range rt {
-		p, e := service.makePost(v)
+		p, e := service.makePost(&v)
 		if e != nil {
 			logger.Error("[Posts.Reply] Cannot make post", e)
 			continue
@@ -100,7 +100,7 @@ func (service *PostService) setReplies(post *Post) error {
 	for lev < maxLev && len(m) != 0 {
 		m2 := make(map[string]*Post)
 		for ; i < lrs && rs[i].Level == lev+1; i += 1 {
-			p, e := service.makePost(rs[i])
+			p, e := service.makePost(&rs[i])
 			if e != nil {
 				logger.Error("[Posts.Reply] Cannot make post", e)
 				continue

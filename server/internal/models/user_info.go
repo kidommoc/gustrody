@@ -40,17 +40,21 @@ func (db *UserDb) QueryUser(username string) (user User, err error) {
 	}
 
 	// try query cache
-	ss, err := db.cache.CacheQueryString([]string{"user:" + username})
-	if err == nil && ss["user:"+username] != "" {
-		err = json.Unmarshal([]byte(ss["user:"+username]), &user)
-		if err == nil {
+	cacheKey := "user:" + username
+	ss, err := db.cache.QueryString([]string{cacheKey})
+	if err == nil {
+		if ss[cacheKey] != "" {
 			// cache hit
-			return user, nil
+			err = json.Unmarshal([]byte(ss[cacheKey]), &user)
+			if err == nil {
+				// use cache
+				return user, nil
+			} else {
+				// cache corrupted. clear cache
+				db.cache.RemoveString("user:" + username)
+			}
 		}
-		// cache corrupted. clear cache
-		db.cache.CacheRemoveString("user:" + username)
-	} else if err != nil && err != ErrNotFound {
-		// don't return
+	} else {
 		logger.Warning("[Models.QueryUser] Failed to query cache.", "error", err)
 	}
 
@@ -74,7 +78,7 @@ func (db *UserDb) QueryUser(username string) (user User, err error) {
 
 	// cache
 	s, _ := json.Marshal(user)
-	go db.cache.CacheSetString("user:"+user.Username.String(), string(s), true)
+	go db.cache.SetString(cacheKey, string(s), true)
 
 	return user, nil
 }
@@ -100,7 +104,7 @@ func (db *UserDb) UpdateUser(user *User) error {
 	if summary == "" {
 		summary = stringClearFlag
 	}
-	go db.cache.CacheUpdateJson("user:"+user.Username.String(), User{
+	go db.cache.UpdateJson("user:"+user.Username.String(), User{
 		Nickname: user.Nickname, Summary: summary, Avatar: user.Avatar,
 	})
 	return nil

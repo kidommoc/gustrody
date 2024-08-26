@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS posts (
   "url" text NOT NULL,
   "date" timestamp NOT NULL,
   "user" text NOT NULL,
-  "replying" text,
+  "replying" varchar(36),
   "vsb" vsb NOT NULL,
   "content" text NOT NULL,
   "media" img[] DEFAULT array[]::img[],

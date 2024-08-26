@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// when attaching error description:
+//
+//	AssertNoError(t, err, "description: %s") // need %s to assert error
 func AssertNoError(t *testing.T, err error, s ...string) {
 	if err != nil {
 		if len(s) != 0 {

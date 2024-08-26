@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS posts (
   "url" text NOT NULL,
   "date" timestamp NOT NULL,
   "user" text NOT NULL,
-  "replying" text,
+  "replying" varchar(36),
   "vsb" vsb NOT NULL,
   "content" text NOT NULL,
   "media" img[] DEFAULT array[]::img[],
@@ -314,12 +314,16 @@ WHERE "id" = ${postID};
 - query a post and it's replyings and replies
 
 ```sql
--- QUERY post
+-- QUERY post with direct replies
 SELECT
   "id", "url", "user", "date",
-  "vsb", "content", "media",
+  "replying", "vsb", "content", "media",
   CARDINALITY("likes") as "likes",
-  CARDINALITY("shares") as "shares"
+  CARDINALITY("shares") as "shares",
+  ARRAY(
+    SELECT "id" FROM posts
+    WHERE "replying" = {postID}
+  ) AS "replies"
 FROM posts
 WHERE "id" = {postID};
 
@@ -362,9 +366,10 @@ FROM posts
 ORDER BY "level" ASC, "date" DESC;
 ```
 
-- query all posts of a user
+- query all posts with direct replies of a user
 
 ```sql
+WITH pp AS (
   WITH rr AS (
     SELECT p1."id", p2."user"
     FROM posts AS p1, posts AS p2
@@ -389,6 +394,14 @@ UNION ALL
     "date" AS "act"
   FROM posts
   WHERE "user" = ${user} AND "replying" IS NULL
+), pr AS (
+  SELECT pp."id", ARRAY_AGG(posts."id")
+  FROM posts, pp
+  WHERE posts."replying" = pp."id"
+  GROUP BY pp."id"
+)
+SELECT pp.*, pr."replies"
+FROM pp LEFT JOIN pr ON pp."id" = pr."id"
 ORDER BY "act" DESC;
 ```
 
@@ -464,18 +477,27 @@ CREATE INDEX sharers ON shares ("user");
 
 ### Queries
 
-- query all shares of a user
+- query all shares with direct replies of a user
 
 ```sql
-SELECT
-  posts."id", posts."url", posts."user", posts."date",
-  shares."vsb", posts."content", posts."media",
-  CARDINALITY("likes") AS "likes",
-  CARDINALITY("shares") AS "shares",
-  NULL AS "replyTo", shares."user" AS "sharedBy",
-  shares."date" AS "act"
-FROM posts, shares
-WHERE shares."user" = ${user} AND posts."id" = shares."id"
+WITH pp AS (
+  SELECT
+    posts."id", posts."url", posts."user", posts."date",
+    shares."vsb", posts."content", posts."media",
+    CARDINALITY("likes") AS "likes",
+    CARDINALITY("shares") AS "shares",
+    NULL AS "replyTo", shares."user" AS "sharedBy",
+    shares."date" AS "act"
+  FROM posts, shares
+  WHERE shares."user" = ${user} AND posts."id" = shares."id"
+), pr AS (
+  SELECT pp."id", ARRAY_AGG(posts."id")
+  FROM pp, posts
+  WHERE posts."replying" = pp."id"
+  GROUP BY pp."id"
+)
+SELECT pp.*, pr."replies"
+FROM pp LEFT JOIN pr ON pp."id" = pr."id"
 ORDER BY "act" DESC;
 ```
 

@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"regexp"
 	"time"
 
 	"github.com/kidommoc/gustrody/internal/logging"
@@ -19,20 +20,22 @@ type Post struct {
 	Content  string    `json:"content,omitempty"`
 	Media    []Img     `json:"media"`
 	Replying string    `json:"replying,omitempty"` // post id
-	ReplyTo  string    `json:"replyTo,omitempty"`  // user id, temporary field
-	SharedBy string    `json:"sharedBy,omitempty"` // user id, temporary field
+	ReplyTo  UD        `json:"replyTo,omitempty"`  // user id, temporary field
+	Replies  []string  `json:"replies,omitempty"`  // post id, temporary field
+	SharedBy UD        `json:"sharedBy,omitempty"` // user id, temporary field
 	Likes    int64     `json:"likes"`              // count, temporary field
 	Shares   int64     `json:"shares"`             // count, temporary field
-	ActDate  string    `json:"actDate,omitempty"`  // temporary field, used in sort
+	ActDate  time.Time `json:"actDate,omitempty"`  // temporary field, used in sort
 	Level    int       `json:"level,omitempty"`    // temporary field, used in replying and replies
 }
 
 // db
 
 type PostDb struct {
-	lg     logging.Logger
-	client *sql.DB
-	cache  *CacheDb
+	lg        logging.Logger
+	client    *sql.DB
+	cache     *CacheDb
+	pageIDReg *regexp.Regexp
 }
 
 var postIns *PostDb = nil
@@ -40,9 +43,10 @@ var postIns *PostDb = nil
 func PostInstance(lg logging.Logger, cl *sql.DB, cache *CacheDb) *PostDb {
 	if postIns == nil {
 		postIns = &PostDb{
-			lg:     lg,
-			client: cl,
-			cache:  cache,
+			lg:        lg,
+			client:    cl,
+			cache:     cache,
+			pageIDReg: regexp.MustCompile(`(post|share):([0-9a-z]+)`),
 		}
 	}
 	return postIns

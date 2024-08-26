@@ -3,6 +3,8 @@ package router
 import (
 	"fmt"
 	"reflect"
+	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kidommoc/gustrody/internal/logging"
@@ -196,10 +198,17 @@ func getUserPosts(c *fiber.Ctx) error {
 		c.Status(fiber.StatusBadRequest)
 		c.SendString("Acquire username")
 	}
+	maxDate := time.Now()
+	mdstring := c.Params("maxdate")
+	if mdstring != "" {
+		if mdunix, err := strconv.ParseInt(mdstring, 0, 64); err == nil {
+			maxDate = time.Unix(mdunix, 0)
+		}
+	}
 
 	var postService *posts.PostService
 	services.Get(reflect.ValueOf(&postService).Elem())
-	list, err := postService.GetByUser(username, target)
+	list, err := postService.GetByUser(username, target, maxDate)
 	switch err {
 	case posts.ErrUserNotFound:
 		c.Status(fiber.StatusNotFound)

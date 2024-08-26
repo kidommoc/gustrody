@@ -8,7 +8,7 @@ Use Redis. Max memory policy: Least frequently used.
 
 `post:<POST_ID>`: the specified post (not federal note). Type: `STRING` of `json`.
 
-`posts:<USERNAME>`: the posts and shares of the specified user. Type: `LIST` of `json` array as cached page.
+`ugc:<USERNAME>`: the posts and shares of the specified user. Type: `LIST` of `json` array as cached page.
 
 > index page: (`LIST[0]`)
 >

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/kidommoc/gustrody/internal/test"
@@ -114,7 +115,10 @@ func TestForeignInboxGet(t *testing.T) {
 		for _, v := range uftTableI {
 			got, err := userDb.GetInboxes(v.input)
 			test.AssertNoError(t, err, "Error when get inbox: %+v")
-			test.AssertEqual(t, v.want, got)
+			slices.Sort(got)
+			want := v.want
+			slices.Sort(want)
+			test.AssertEqual(t, want, got)
 		}
 	})
 }

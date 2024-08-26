@@ -7,7 +7,6 @@ import (
 )
 
 const redisMaxRetries = 20
-const redisPageSize = 20
 
 type Img struct {
 	Type string `json:"type,omitempty"`

@@ -53,6 +53,7 @@ func TestUserSetAndQuery(t *testing.T) {
 		input.Keys.Pub, input.Keys.Pri = utils.NewKeyPair()
 		err := userDb.SetUser(&input)
 		test.AssertNoError(t, err, "Error when set: %+v")
+		time.Sleep(500 * time.Millisecond)
 	})
 
 	t.Run("Query", func(t *testing.T) {
