@@ -2,10 +2,11 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
+	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/utils"
-	"github.com/lib/pq"
 )
 
 type IPostShare interface {
@@ -14,134 +15,110 @@ type IPostShare interface {
 	RemoveShare(user UD, id string) error
 }
 
-// ERRORS
-//
-//   - DbInternal
-//   - NotFound "post"
 func (db *PostDb) QueryShares(id string) (list []UD, err error) {
-	logger := db.lg
-	qs := ` SELECT "shares"
-			FROM posts
-			WHERE "id" = $1;`
-	r := db.client.QueryRow(qs, id)
+	const loc = "Models.SharePost.Query"
+	const qs = `SELECT "user" FROM "share" WHERE "tgt" = $1;`
+	r, err := db.client.Query(qs, id)
+	if err != nil {
+		logging.Cannot(db.lg, loc, fmt.Sprintf("query shares of %s", id), err)
+		return nil, ErrDbInternal
+	}
+	defer r.Close()
 
-	e := r.Scan(pq.Array(&list))
-	if e != nil {
-		switch e {
-		case sql.ErrNoRows:
-			return nil, ErrNotFound
-		default:
-			logger.Error("[Model.Like] Cannot scan row", e)
-			return nil, ErrDbInternal
+	for r.Next() {
+		var u UD
+		if err := r.Scan(&u); err != nil {
+			continue
 		}
+		list = append(list, u)
 	}
 	return list, nil
 }
 
-// ERRORS
-//
-//   - DbInternal
-//   - NotFound "post"
-//   - Dunplicate "share"
 func (db *PostDb) SetShare(user UD, id string, date time.Time, vsb utils.Vsb) error {
-	logger := db.lg
-	if !db.IsPostExist(id) {
-		return ErrNotFound
-	}
+	const loc = "Models.SharePost.Set"
 
-	tx, e := db.client.Begin()
-	if e != nil {
-		logger.Error("[Model.Share] Cannot start transaction", e)
-		return ErrDbInternal
-	}
+	const qd = `SELECT 1 FROM "share" WHERE "user" = $1 AND "tgt" = $2;`
+	const qs = `INSERT INTO "share"("user", "tgt", "date", "vsb") VALUES($1, $2, $3, $4);`
 
-	// update posts.shares
-	qs := ` UPDATE posts
-			SET "shares" = ARRAY_APPEND("shares", $1)
-			WHERE "id" = $2 AND ARRAY_POSITION("shares", $1) IS NULL;`
-	r, e := sqlExec(tx.Exec(qs, user, id))
-	if e != nil {
-		logger.Error("[Model.Share] Failed to execute", e)
-		return ErrDbInternal
-	}
-	if r == 0 {
-		return ErrDunplicate
-	}
+	err := func() error {
+		for i := 0; i < txMaxRetries; i++ {
+			if err := func() error {
+				tx, err := db.client.BeginTx(defaultCtx, nil)
+				if err != nil {
+					return ErrDbInternal
+				}
+				defer tx.Rollback()
 
-	// insert into shares
-	qs = `  INSERT INTO shares("user", "id", "date", "vsb")
-			VALUES ($1, $2, $3, $4);`
-	r, e = sqlExec(tx.Exec(qs, user, id, date, vsb.String()))
-	if e != nil {
-		logger.Error("[Model.Share] Failed to execute", e)
-		return ErrDbInternal
-	}
-	if r == 0 {
-		return ErrDunplicate
-	}
+				// check post
+				pe, err := isPostExist(tx, id)
+				if err != nil {
+					logging.Cannot(db.lg, loc, fmt.Sprintf("check existence of post %s", id), err)
+					return ErrDbInternal
+				}
+				if !pe {
+					return ErrNotFound
+				}
 
-	if e := tx.Commit(); e != nil {
-		logger.Error("[Model.Share] Cannot commit", e)
-		return ErrDbInternal
+				// check user
+				ue, err := isUserExist(tx, user.String())
+				if err != nil {
+					logging.Cannot(db.lg, loc, fmt.Sprintf("check existence of user %s", user.String()), err)
+					return ErrDbInternal
+				}
+				if !ue {
+					return ErrNotFound
+				}
+
+				// check duplicated
+				r := tx.QueryRow(qd, user, id)
+				var n int
+				if err := r.Scan(&n); err != nil {
+					switch err {
+					case sql.ErrNoRows:
+					default:
+						logging.Cannot(db.lg, loc, fmt.Sprintf("check duplicated of %s sharing %s", user.String(), id), err)
+						return ErrDbInternal
+					}
+				} else {
+					return ErrDuplicated
+				}
+
+				// set share
+				if _, err := sqlExec(tx.Exec(qs, user, id, date, vsb)); err != nil {
+					logging.FailedTo(db.lg, loc, fmt.Sprintf("set %s sharing %s", user.String(), id), err)
+					return ErrDbInternal
+				}
+
+				if err := tx.Commit(); err != nil {
+					return fmt.Errorf("t")
+				}
+				return nil
+			}(); err == nil || err.Error() != "t" {
+				return err
+			}
+		}
+		return ErrMaxRetries
+	}()
+
+	// cache
+	if err == nil {
+		go db.cache.UpdateJson("post:"+id, &PostCache{atomic: true, Shares: 1})
 	}
-	return nil
+	return err
 }
 
-// ERRORS
-//
-//   - DbInternal
-//   - NotFound "post", "share"
 func (db *PostDb) RemoveShare(user UD, id string) error {
-	logger := db.lg
-	if !db.IsPostExist(id) {
-		return ErrNotFound
-	}
-
-	tx, e := db.client.Begin()
-	if e != nil {
-		logger.Error("[Model.Share] Cannot start transaction", e)
+	const loc = "Models.SharePost.Remove"
+	const qs = `DELETE FROM "share" WHERE "user" = $1 AND "tgt" = $2;`
+	r, err := sqlExec(db.client.Exec(qs, user, id))
+	if err != nil {
+		logging.FailedTo(db.lg, loc, fmt.Sprintf("remove %s sharing %s", user.String(), id), err)
 		return ErrDbInternal
 	}
-
-	// use 2 annoymous func to ensure completely deletion
-
-	err1 := func() error {
-		qs := ` UPDATE posts
-				SET "shares" = ARRAY_REMOVE("shares", $1)
-				WHERE "id" = $2;`
-		r, e := sqlExec(tx.Exec(qs, user, id))
-		if e != nil {
-			logger.Error("[Model.Share] Failed to exec", e)
-			return ErrDbInternal
-		}
-		if r == 0 {
-			return ErrNotFound
-		}
-		return nil
-	}()
-
-	err2 := func() error {
-		qs := ` DELETE FROM shares
-				WHERE "user" = $1 AND "id" = $2;`
-		r, e := sqlExec(tx.Exec(qs, user, id))
-		if e != nil {
-			logger.Error("[Model.Share] Failed to exec", e)
-			return ErrDbInternal
-		}
-		if r == 0 {
-			return ErrNotFound
-		}
-		return nil
-	}()
-
-	if e := tx.Commit(); e != nil {
-		logger.Error("[Model.Share] Cannot commit", e)
-		return ErrDbInternal
-	}
-
-	if err1 != nil || err2 != nil {
+	if r == 0 {
 		return ErrNotFound
-	} else {
-		return nil
 	}
+	go db.cache.UpdateJson("post:"+id, &PostCache{atomic: true, Shares: -1})
+	return nil
 }

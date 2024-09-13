@@ -6,22 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/kidommoc/gustrody/internal/logging"
 	"github.com/kidommoc/gustrody/internal/utils"
 )
-
-// models
-
-type User struct {
-	Username    UD          `json:"username"`
-	Nickname    string      `json:"nickname"`
-	Summary     string      `json:"summary"`
-	Avatar      Img         `json:"avatar"`
-	Keys        KeyPair     `json:"keys,omitempty"`
-	Preferences Preferences `json:"preferences,omitempty"`
-}
 
 type UD struct {
 	Username string `json:"username,omitempty"`
@@ -77,41 +65,17 @@ func (ud *UD) Scan(src interface{}) error {
 	return nil
 }
 
-type KeyPair struct {
-	Pub string `json:"pub,omitempty"`
-	Pri string `json:"pri,omitempty"`
-}
-
-// implement database/sql/driver.Valuer
-func (kp KeyPair) Value() (driver.Value, error) {
-	pub := strings.ReplaceAll(kp.Pub, "\n", "#n")
-	pri := strings.ReplaceAll(kp.Pri, "\n", "#n")
-	return fmt.Sprintf(`("%s","%s")`, pub, pri), nil
-}
-
-// implement database/sql.Scanner
-func (kp *KeyPair) Scan(src interface{}) error {
-	b, ok := src.([]byte)
-	if !ok {
-		return fmt.Errorf("Scan key pair: src cannot cast to []byte")
-	}
-	fields := strings.Split(strings.Trim(string(b), "()"), ",")
-	if len(fields) != 2 {
-		return fmt.Errorf("Scan key pair: wrong syntax")
-	}
-	kp.Pub = strings.ReplaceAll(strings.Trim(fields[0], `"`), "#n", "\n")
-	kp.Pri = strings.ReplaceAll(strings.Trim(fields[1], `"`), "#n", "\n")
-	return nil
-}
-
 type Preferences struct {
-	PostVsb  string `json:"postVsb,omitempty"`
-	ShareVsb string `json:"shareVsb,omitempty"`
+	Lock     bool      `json:"lock,omitempty"`
+	PostVsb  utils.Vsb `json:"postVsb"`
+	ShareVsb utils.Vsb `json:"shareVsb"`
 }
 
 // implement database/sql/driver.Valuer
 func (p Preferences) Value() (driver.Value, error) {
-	return json.Marshal(p)
+	pp := p
+	pp.Lock = false
+	return json.Marshal(pp)
 }
 
 // implement database/sql.Scanner
@@ -122,6 +86,60 @@ func (p *Preferences) Scan(src interface{}) error {
 	}
 	return json.Unmarshal(b, p)
 }
+
+// models
+
+const userJsonType = "::user"
+
+type User struct {
+	Username UD     `json:"username"`
+	Foreign  bool   `json:"foreign"`
+	ID       string `json:"id"`
+	Nickname string `json:"nickname"`
+	Summary  string `json:"summary"`
+	Avatar   *Img   `json:"avatar"`
+	Lock     bool   `json:"lock"`
+	PubKey   string `json:"pub_key,omitempty"`
+	PriKey   string `json:"pri_key,omitempty"`
+	Type     string `json:"__type,omitempty"` // used for cache update
+}
+
+// used for update cache
+type UserCache struct {
+	Nickname string `json:"nickname"`
+	Summary  string `json:"summary"`
+	Avatar   *Img   `json:"avatar"`
+	Lock     bool   `json:"lock"`
+}
+
+// implements cache.IJsonable
+func (u *UserCache) Json() (map[string]interface{}, error) {
+	m, err := structToMap(u)
+	if err != nil {
+		return nil, err
+	}
+	m[jsonTypeKey] = userJsonType
+	return m, nil
+}
+
+// implements cache.IJsonable
+func (p *UserCache) Atomic() bool {
+	return false
+}
+
+/*
+type UserPf struct {
+	Username    UD          `json:"username"`
+	Password    string      `json:"password"`
+	Preferences Preferences `json:"preferences"`
+}
+
+type ForeignInbox struct {
+	Username    UD     `json:"username"`
+	Inbox       string `json:"inbox"`
+	SharedInbox string `json:"shared"`
+}
+*/
 
 // db
 

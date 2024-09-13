@@ -255,3 +255,11 @@ func (l *logger) Error(msg string, err error) {
 	}
 	l.mutex.Unlock()
 }
+
+func Cannot(lg Logger, loc, act string, err error) {
+	lg.Error(fmt.Sprintf("[%s] Cannot %s.", loc, act), err)
+}
+
+func FailedTo(lg Logger, loc, act string, err error) {
+	lg.Error(fmt.Sprintf("[%s] Failed to %s.", loc, act), err)
+}

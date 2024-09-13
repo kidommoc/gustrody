@@ -3,8 +3,8 @@ package models
 import "errors"
 
 var ErrNotFound = errors.New("NotFound")
-var ErrDunplicate = errors.New("Dunplicate")
-var ErrFormat = errors.New("Syntax")
+var ErrDuplicated = errors.New("Duplicated")
+var ErrFormat = errors.New("Format")
 var ErrDbInternal = errors.New("DbInternal")
 var ErrMaxRetries = errors.New("MaxRetries")
 var ErrNoEnoughPages = errors.New("NoEnoughPages")

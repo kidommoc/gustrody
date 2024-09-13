@@ -7,7 +7,6 @@ import (
 
 	"github.com/kidommoc/gustrody/internal/config"
 	"github.com/kidommoc/gustrody/internal/logging"
-	"github.com/kidommoc/gustrody/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,18 +15,6 @@ var defaultCtx = context.Background()
 func Init() {
 	logger := logging.Get()
 	cfg := config.Get()
-
-	authClient := initRedis(cfg, logger, redisOpt{
-		Addr:    "localhost:6739", // will change after apply docker compose
-		Db:      0,
-		MaxConn: 3,
-	})
-	auth := AuthInstance(logger, authClient)
-	logger.Info("[Models] Initailized AuthDb")
-	if cfg.Debug {
-		registerTestUsers(auth)
-		logger.Debug("[Models] registered test user accounts")
-	}
 
 	cacheClient := initRedis(cfg, logger, redisOpt{
 		Addr:    "localhost:6738",
@@ -45,23 +32,6 @@ func Init() {
 	logger.Info("[Models] Initailized UserDb")
 	PostInstance(logger, mainClient, cache)
 	logger.Info("[Models] Initailized PostDb")
-}
-
-func registerTestUsers(db IAuthDb) {
-	logger := logging.Get()
-	pwd := string(utils.SHA256Hash("penguin"))
-	e := db.SetUserPassword("u1", pwd)
-	if e != nil {
-		logger.Error("when init u1", e)
-	}
-	e = db.SetUserPassword("u2", pwd)
-	if e != nil {
-		logger.Error("when init u1", e)
-	}
-	e = db.SetUserPassword("u3", pwd)
-	if e != nil {
-		logger.Error("when init u1", e)
-	}
 }
 
 type pqOpt struct {

@@ -2,20 +2,16 @@
 
 Use PostgreSql. Database: `austrody`
 
-## TYPEs
+![Entity Relation Diagram](./ER.svg)
+
+## TYPES
 
 - vsb: visibility of post
-- kp: user's encryption key pair (RSA)
 - img: image
 
 ```sql
 CREATE TYPE vsb AS ENUM (
-  'public', 'follower', 'direct'
-);
-
-CREATE TYPE kp AS (
-  "pub" text,
-  "pri" text
+  0, 1, 2
 );
 
 CREATE TYPE img AS (
@@ -25,492 +21,284 @@ CREATE TYPE img AS (
 );
 ```
 
-## TABLE: users
+## TABLE: `users`
 
-- username *PRIMARY*: `varchar(20)`
+- username *PRIMARY*: `text`
+- foreign: `boolean` marking whether a foreign user
+- id *INDEX*: `text` as foreign user's activitypub id
 - nickname: `text`
-- summary *NULLABLE*: `text`
+- summary: `text`
 - avatar *NULLABLE*: `img`
-- keys: `kp` as user's key pair
-- preference: `json`
-
-```sql
-CREATE TABLE IF NOT EXISTS users (
-  "username" varchar(20) PRIMARY KEY,
-  "nickname" text NOT NULL,
-  "summary" text,
-  "avatar" img,
-  "keys" kp NOT NULL,
-  "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}'
-);
-
--- CREATE INDEX user_pf_postVsb ON users USING gin(("preferences"->'postVsb'));
--- CREATE INDEX user_pf_shareVsb ON users USING gin(("preferences"->'shareVsb'));
-```
-
-### Queries
-
-- query a user's information
-
-```sql
-SELECT
-  "username", "nickname", "summary", "avatar"
-FROM users
-WHERE "username" = ${username};
-```
-
-- insert a new user
-
-```sql
-INSERT INTO users(
-  "username", "nickname", "keys"
-)
-VALUES (
-  ${username}, ${nickname}, ROW(${pub_key}, ${pri_key})
-);
-```
-
-- set user information
-
-```sql
-UPDATE users
-SET
-  "nickname" = ${nickname},
-  "summary" = ${summary},
-  "avatar" = ROW(${media_type}, ${avatar_url},)
-WHERE "username" = ${username};
-```
-
-- query a user's encryption key pair
-
-```sql
-SELECT ("keys")."pub", ("keys")."pri"
-FROM users
-WHERE "username" = ${username};
-```
-
-- query a user's preference
-
-```sql
-SELECT "preferences"
-FROM users
-WHERE "username" = ${username};
-```
-
-- set a user's preference
-
-```sql
-UPDATE users
-SET "preferences" = ${preference_json}
-WHERE "username" = ${username};
-```
-
-## TABLE: foreign_users
-
-- username *PRIMARY, INDEX*: `text`
-- id: `text`
-- avatar: `text` as avatar local url
-- avatarUrl: `text` as avatar remote url
-- inbox: `text` as url
-- pub: `text` as RSA public key
-
-```sql
-CREATE TABLE IF NOT EXISTS foreign_users (
-  "user" text PRIMARY KEY,
-  "id" text NOT NULL,
-  "avatar" text,
-  "avatarUrl" text,
-  "inbox" text NOT NULL,
-  "pub" text NOT NULL
-);
-```
-
-*Note*: `user` syntax is `username@domain`.
-
-### Queries
-
-- insert a foreign user
-
-```sql
-INSERT INTO foreign_users(
-  "user", "id", "avatar", "avatarUrl", "pub", "inbox"
-)
-VALUES (
-  ${username@domain}, ${user_id},
-  ${avatar_url}, ${avatarRemoteUrl},
-  ${public_key}, ${inbox_url}
-);
-
-CREATE INDEX foreign_id ON foreign_users ("id");
-```
-
-- query a foreign user
-
-```sql
-SELECT
-  "user", "id", "avatar", "avatarUrl", "pub", "inbox"
-FROM foreign_users
-WHERE "user" = ${username@domain};
-```
-
-- query all shared inboxes of a group of users
-
-```sql
-SELECT DISTINCT "inbox"
-FROM foreign_users
-WHERE "user" IN ARRAY(${username@domain}, ...);
-```
-
-## TABLE: follow
-
-- from *PRIMARY, INDEX*: `text`
-- to *PRIMARY, INDEX*: `text`
+- lock: `boolean` indicating whether a locked account
+- pub_key: `text` as user's public key (RSA)
+- pri_key: `text` as local user's private key (RSA)
 
 CONSTRAINT:
 
-- `"from"` != `to`
+- if `foreign`, `id` must not null; else `pri_key` must not null.
+
+> NOTE: for foreign user, `username` syntax is `username@domain`.
 
 ```sql
-CREATE TABLE IF NOT EXISTS follow (
-  "from" text,
-  "to" text CHECK ("to" <> "from"),
-  PRIMARY KEY ("from", "to")
+CREATE TABLE IF NOT EXISTS "users" (
+  "username" text,
+  "foreign" boolean NOT NULL,
+  "id" text NOT NULL UNIQUE,
+  "nickname" text NOT NULL,
+  "summary" text DEFAULT '',
+  "avatar" img,
+  "lock" boolean DEFAULT FALSE,
+  "pub_key" text NOT NULL,
+  "pri_key" text,
+  PRIMARY KEY ("username"),
+  CONSTRAINT "foreign_user" CHECK (
+    ("foreign" = FALSE AND "pri_key" <> NULL) OR "foreign" = TRUE
+  )
 );
 
-CREATE INDEX user_follows ON follow ("from");
-CREATE INDEX user_be_followed ON follow ("to");
+CREATE INDEX "user_id" ON "users"("id");
 
-CREATE VIEW follow_info ("user", "followings", "followers") AS
-  WITH followings AS (
-    SELECT "from" AS u, COUNT(*) AS c
-    FROM follow
-    GROUP BY u
-  ), followers AS (
-    SELECT "to" AS u, COUNT(*) AS c
-    FROM follow
-    GROUP BY u
+CREATE VIEW "user_content" AS 
+    SELECT "user", "tgt" AS "id", "date", "vsb", "user" AS "shared_by"
+    FROM "share"
+  UNION
+    SELECT "user", "id", "date", "vsb", NULL AS "shared_by"
+    FROM "posts"
+  ORDER BY "date" DESC;
+```
+
+### Query all status of a user
+
+> It's necessary to filter by `vsb`
+
+```sql
+WITH "l" AS (
+  SELECT
+    "tgt" AS "id", "date" AS "act",
+    ${user} AS "shared_by", NULL AS "reply_to"
+  FROM "share" WHERE "user" = ${user}
+UNION
+  SELECT
+    "posts"."id", "posts"."date" AS "act",
+    NULL AS "shared_by", "reply"."tgt_user" AS "reply_to"
+  FROM "posts" LEFT JOIN "reply"
+    ON "posts"."user" = ${user} AND "reply"."id" = "posts"."id"
+)
+SELECT * FROM "l"
+-- filtered by date
+ORDER BY "act" DESC
+-- limit size
+;
+```
+
+## TABLE: `user_preferences`
+
+- username: `text`, referencing `users.username`
+- password: `text` as encrypted password
+- preferences: `jsonb`
+
+> NOTE: Only local users
+
+```sql
+CREATE TABLE IF NOT EXISTS "user_preferences" (
+  "username" text,
+  "password" text,
+  "preferences" jsonb DEFAULT '{"postVsb":"public","shareVsb":"public"}',
+  PRIMARY KEY ("username"),
+  FOREIGN KEY ("username") REFERENCES "users"("username")
+);
+```
+
+## TABLE: `foreign_inboxes`
+
+- username: `text`, referencing `users.username`
+- inbox: `text` as user inbox url
+- shared *NULLABLE*: `text` as instance inbox url
+
+```sql
+CREATE TABLE IF NOT EXISTS "foreign_inboxes" (
+  "username" text,
+  "inbox" text NOT NULL,
+  "shared" text,
+  PRIMARY KEY ("username"),
+  FOREIGN KEY ("username") REFERENCES "users"("username")
+);
+```
+
+## TABLE: `follow`
+
+- from *PRIMARY, INDEX*: `text`, referencing `users.username`
+- to *PRIMARY, INDEX*: `text`, referencing `users.username`
+
+CONSTRAINT:
+
+- `from` != `to`
+
+```sql
+CREATE TABLE IF NOT EXISTS "follow" (
+  "from" text,
+  "to" text CHECK ("to" <> "from"),
+  PRIMARY KEY ("from", "to"),
+  FOREIGN KEY ("from") REFERENCES "users"("username"),
+  FOREIGN KEY ("to") REFERENCES "users"("username")
+);
+
+CREATE INDEX "user_follows" ON "follow" ("from");
+CREATE INDEX "user_be_followed" ON "follow" ("to");
+
+CREATE VIEW "follow_data" ("user", "followings", "followers") AS
+  WITH "followings" AS (
+    SELECT "from" AS "u", COUNT(*) AS "c"
+    FROM "follow" GROUP BY "u"
+  ), "followers" AS (
+    SELECT "to" AS "u", COUNT(*) AS "c"
+    FROM "follow" GROUP BY "u"
   )
   SELECT
-    users."username" AS "user",
-    COALESCE(followings.c, 0) AS "followings",
-    COALESCE(followers.c, 0) AS "followers"
-  FROM users
-  FULL JOIN followings
-    ON users."username" = followings.u
-  FULL JOIN followers
-    ON users."username" = followers.u;
+    "users"."username" AS "user",
+    COALESCE("followings"."c", 0) AS "followings",
+    COALESCE("followers"."c", 0) AS "followers"
+  FROM "users"
+  FULL JOIN "followings"
+    ON "users"."username" = "followings"."u"
+  FULL JOIN "followers"
+    ON "users"."username" = "followers"."u";
 ```
 
-*Note*: `from` and `to` syntax is `username` for local user or `username@domain` for foreign user.
-
-### Queries
-
-- query a user's followings:
-
-``` sql
-SELECT "to" AS "followings"
-FROM follow
-WHERE "from" = ${username};
-```
-
-- query a user's followers:
-
-``` sql
-SELECT "from" AS "followers"
-FROM follow
-WHERE "to" = ${username};
-```
-
-- query a user's follow data
-
-```sql
-SELECT "followings", "followers"
-FROM follow_info
-WHERE "user" = ${username};
-```
-
-- set follow relationship
-
-```sql
--- SET
-INSERT INTO follow("from", "to")
-VALUES (${from}, ${to});
-
--- UNSET
-DELETE FROM follow
-WHERE "from" = ${from} AND "to" = ${to};
-```
-
-## TABLE: posts
+## TABLE: `posts`
 
 - id *PRIMARY*: `text` as uuid
+- tombstone: `boolean` as whether a removed post
 - url: `text` as url
+- user *INDEX*: `text`, referencing `user.username`
 - date: `timestap`
-- user *INDEX*: `varchar(60)`
-- replying *NULLABLE*: `text` as id of the post replied
 - vsb: `vsb` as visibility of post
 - content: `text`
 - media: `img[]` as images attaching to this post
-- likes: `text[]` as id of the users liking this post
-- shares: `text[]` as id of the users sharing this post
 
 ```sql
-CREATE TABLE IF NOT EXISTS posts (
+CREATE TABLE IF NOT EXISTS "posts" (
   "id" varchar(36) NOT NULL,
-  "url" text NOT NULL,
-  "date" timestamp NOT NULL,
+  "tombstone" boolean DEFAULT FALSE,
+  "fid" text NOT NULL UNIQUE,
   "user" text NOT NULL,
-  "replying" varchar(36),
+  "date" timestamp NOT NULL,
   "vsb" vsb NOT NULL,
   "content" text NOT NULL,
   "media" img[] DEFAULT array[]::img[],
-  "likes" text[] DEFAULT array[]::text[],
-  "shares" text[] DEFAULT array[]::text[]
+  PRIMARY KEY ("id"),
+  FOREIGN KEY ("user") REFERENCES "users"("username")
 );
 
-CREATE INDEX posters ON posts ("user");
+CREATE INDEX "posters" ON "posts" ("user");
+
+CREATE VIEW "post_data" AS
+  WITH "r" AS (
+    SELECT "tgt", COUNT(*) AS "c"
+    FROM "reply" GROUP BY "tgt"
+  ),
+  "s" AS (
+    SELECT "tgt", COUNT(*) AS "c"
+    FROM "share" GROUP BY "tgt"
+  ),
+  "l" AS (
+    SELECT "tgt", COUNT(*) AS "c"
+    FROM "like" GROUP BY "tgt"
+  ), "ps" AS (
+    SELECT
+      "posts".*,
+      COALESCE("r"."c", 0) AS "replies",
+      COALESCE("s"."c", 0) AS "shares",
+      COALESCE("l"."c", 0) AS "likes"
+    FROM "posts"
+    FULL JOIN "r" ON "posts"."id" = "r"."tgt"
+    FULL JOIN "s" ON "posts"."id" = "s"."tgt"
+    FULL JOIN "l" ON "posts"."id" = "l"."tgt"
+  )
+  SELECT "ps".*, "reply"."tgt" AS "replying", "reply"."tgt_user" AS "reply_to"
+  FROM "ps" LEFT JOIN "reply" ON "ps"."id" = "reply"."id";
 ```
 
 *Note*: `user` syntax is `username` for local users or `username@domain` for foreign users.
 
-### Queries
+## TABLE: `reply`
 
-- insert a post
+- id *PRIMARY, FOREIGN*: `text` as uuid of the replying post, referencing to `posts.id`
+- reply *PRIMARY, FOREIGN, INDEX*: `text` as uuid of the post replied, referencing to `posts.id`
 
 ```sql
-INSERT INTO posts(
-  "id", "url", "user", "date",
-  "vsb", "content", "replying",
-  "media"
-)
-VALUES (
-  ${postID}, ${url}, ${user}, ${date},
-  ${replying}, ${vsb}, ${content},
-  ARRAY[
-    ROW(${mediaUrl}, ${alt_text}), ...
-  ]
+CREATE TABLE IF NOT EXISTS "reply" (
+  "id" varchar(36) UNIQUE,
+  "tgt" varchar(36),
+  "tgt_user" text,
+  PRIMARY KEY ("id", "tgt"),
+  FOREIGN KEY ("id") REFERENCES "posts"("id"),
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
+  FOREIGN KEY ("tgt_user") REFERENCES "users"("username")
 );
+
+CREATE INDEX "post_replies" ON "reply"("tgt");
 ```
 
-- update a post
+### Query
 
 ```sql
-UPDATE posts
-SET
-  "date" = ${date}, "content" = ${content}, 
-  "media" = ARRAY[
-    ROW(${media_type}, ${media_url}, ${alt_text}), ...
-  ]
-WHERE "id" = ${postID};
-```
-
-- delete a post
-
-```sql
-DELETE FROM posts
-WHERE "id" = ${postID};
-```
-
-- query a post and it's replyings and replies
-
-```sql
--- QUERY post with direct replies
-SELECT
-  "id", "url", "user", "date",
-  "replying", "vsb", "content", "media",
-  CARDINALITY("likes") as "likes",
-  CARDINALITY("shares") as "shares",
-  ARRAY(
-    SELECT "id" FROM posts
-    WHERE "replying" = {postID}
-  ) AS "replies"
-FROM posts
-WHERE "id" = {postID};
-
--- QUERY replyings
-WITH RECURSIVE rt AS (
-    SELECT "id", "replying", 0 AS "level" FROM posts
-    WHERE "id" = ${postID}
+-- replying
+WITH RECURSIVE "rs" AS (
+    SELECT "id", "tgt" FROM "reply" WHERE "id" = ${postID}
   UNION ALL
-    SELECT posts."id", posts."replying", rt."level" + 1
-    FROM posts
-      JOIN rt ON posts."id" = rt."replying"
+    SELECT "reply"."id", "reply"."tgt" FROM "reply"
+    JOIN "rs" ON "rs"."tgt" = "reply"."id"
 )
-SELECT
-  posts."id", posts."url", posts."user", posts."date",
-  posts."vsb", posts."content", posts."media",
-  CARDINALITY(posts."likes") AS "likes",
-  CARDINALITY(posts."shares") AS "shares",
-  posts."replying", rt."level"
-FROM posts
-  JOIN rt ON posts."id" = rt."id"
-ORDER BY "level" ASC, "date" DESC;
+SELECT "id", "tgt" FROM "rs";
 
--- QUERY replies
-WITH RECURSIVE rs AS (
-    SELECT "id", "replying", 0 AS "level" FROM posts
-    WHERE "id" = ${postID}
+-- replies
+WITH RECURSIVE "rs" AS (
+    SELECT "id", "tgt" FROM "reply" WHERE "tgt" = ${postID}
   UNION ALL
-    SELECT posts."id", posts."replying", rs."level" + 1
-    FROM posts
-      JOIN rs ON rs."id" = posts."replying"
+    SELECT "reply"."id", "reply"."tgt" FROM "reply"
+    JOIN "rs" ON "rs"."id" = "reply"."tgt"
 )
-SELECT
-  posts."id", posts."url", posts."user", posts."date",
-  posts."vsb", posts."content", posts."media",
-  CARDINALITY(posts."likes") AS "likes",
-  CARDINALITY(posts."shares") AS "shares",
-  posts."replying", rs."level"
-FROM posts
-  JOIN rs ON posts."id" = rs."id"
-ORDER BY "level" ASC, "date" DESC;
+SELECT "id", "tgt" FROM "rs";
 ```
 
-- query all posts with direct replies of a user
+## TABLE: `like`
+
+- user *PRIMARY*: `text`, referencing `user.username`
+- id *PRIMARY, FOREIGN, INDEX*: `text` as uuid, referencing to `posts.id`
 
 ```sql
-WITH pp AS (
-  WITH rr AS (
-    SELECT p1."id", p2."user"
-    FROM posts AS p1, posts AS p2
-    WHERE p1."user" = ${user} AND p2."id" = p1."replying"
-  )
-  SELECT
-    posts."id", posts."url", posts."user", posts."date",
-    posts."vsb", posts."content", posts."media",
-    CARDINALITY("likes") AS "likes",
-    CARDINALITY("shares") AS "shares",
-    rr."user" AS "replyTo", NULL AS "sharedBy",
-    posts."date" AS "act"
-  FROM posts, rr
-  WHERE posts."user" = ${user} AND posts."id" = rr."id"
-UNION ALL
-  SELECT
-    "id", "url", "user", "date",
-    "vsb", "content", "media",
-    CARDINALITY("likes") AS "likes",
-    CARDINALITY("shares") AS "shares",
-    NULL AS "replyTo", NULL AS "sharedBy",
-    "date" AS "act"
-  FROM posts
-  WHERE "user" = ${user} AND "replying" IS NULL
-), pr AS (
-  SELECT pp."id", ARRAY_AGG(posts."id")
-  FROM posts, pp
-  WHERE posts."replying" = pp."id"
-  GROUP BY pp."id"
-)
-SELECT pp.*, pr."replies"
-FROM pp LEFT JOIN pr ON pp."id" = pr."id"
-ORDER BY "act" DESC;
+CREATE TABLE IF NOT EXISTS "like" (
+  "user" text,
+  "tgt" varchar(36),
+  PRIMARY KEY ("user", "tgt"),
+  FOREIGN KEY ("user") REFERENCES "users"("username"),
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id")
+);
+
+CREATE INDEX "post_likes" ON "like"("tgt");
 ```
 
-- query a post's likes
+## TABLE: `share`
 
-```sql
-SELECT "likes"
-FROM posts
-WHERE "id" = ${postID};
-```
-
-- set liking of a post
-
-```sql
--- SET
-UPDATE posts
-SET "likes" = ARRAY_APPEND("likes", ${user})
-WHERE
-  "id" = ${postID}
-  AND ARRAY_POSITION("likes", ${user}) IS NULL;
-
--- UNSET
-UPDATE posts
-SET "likes" = ARRAY_REMOVE("likes", ${user})
-WHERE "id" = ${postID};
-```
-
-- query a post's shares
-
-```sql
-SELECT "shares"
-FROM posts
-WHERE "id" = ${postID};
-```
-- set sharing of a post
-
-*NOTE*: These statements should be part of a transaction
-
-```sql
--- SET
-UPDATE posts
-SET "shares" = ARRAY_APPEND("shares", ${user})
-WHERE
-  "id" = ${postID}
-  AND ARRAY_POSITION("shares", ${user}) IS NULL;
-
--- UNSET
-UPDATE posts
-SET "shares" = ARRAY_REMOVE("shares", ${user})
-WHERE "id" = ${postID};
-```
-
-## TABLE: shares
-
-- id *PRIMARY, FOREIGN*: `text` as uuid, referencing to `posts."id"`
-- user *PRIMARY, INDEX*: `text`
+- user *PRIMARY, INDEX*: `text` as username
+- id *PRIMARY, FOREIGN, INDEX*: `text` as uuid, referencing to `posts."id"`
 - date: `timestamp`
+- vsb: `vsb` as visibility of sharing
 
 ```sql
-CREATE TABLE IF NOT EXISTS shares (
+CREATE TABLE IF NOT EXISTS "share" (
   "user" text NOT NULL,
-  "id" varchar(36) NOT NULL,
+  "tgt" varchar(36) NOT NULL,
   "date" timestamp NOT NULL,
   "vsb" vsb NOT NULL,
-  PRIMARY KEY ("id", "user"),
-  FOREIGN KEY ("id") REFERENCES posts("id")
+  PRIMARY KEY ("user", "tgt"),
+  FOREIGN KEY ("user") REFERENCES "users"("username"),
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id")
 );
 
-CREATE INDEX sharers ON shares ("user");
+CREATE INDEX "post_shares" ON "share"("tgt");
+CREATE INDEX "sharer" ON "share"("user");
 ```
 
 *Note*: `user` syntax is `username` for local users or `username@domain` for foreign users.
-
-### Queries
-
-- query all shares with direct replies of a user
-
-```sql
-WITH pp AS (
-  SELECT
-    posts."id", posts."url", posts."user", posts."date",
-    shares."vsb", posts."content", posts."media",
-    CARDINALITY("likes") AS "likes",
-    CARDINALITY("shares") AS "shares",
-    NULL AS "replyTo", shares."user" AS "sharedBy",
-    shares."date" AS "act"
-  FROM posts, shares
-  WHERE shares."user" = ${user} AND posts."id" = shares."id"
-), pr AS (
-  SELECT pp."id", ARRAY_AGG(posts."id")
-  FROM pp, posts
-  WHERE posts."replying" = pp."id"
-  GROUP BY pp."id"
-)
-SELECT pp.*, pr."replies"
-FROM pp LEFT JOIN pr ON pp."id" = pr."id"
-ORDER BY "act" DESC;
-```
-
-- set sharing of a post:
-
-*NOTE*: These statements should be part of a transaction
-
-```sql
--- SET
-INSERT INTO shares("user", "id", "date", "vsb")
-VALUES (${user}, ${postID}, ${date}, ${vsb});
-
--- UNSET
-DELETE FROM shares
-WHERE "user" = ${user} and "id" = ${postID};
-```

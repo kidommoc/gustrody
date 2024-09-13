@@ -1,12 +1,20 @@
 package models
 
 import (
+	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
 
-const redisMaxRetries = 20
+const txMaxRetries = 16
+
+type ISqlClient interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+	Exec(query string, args ...any) (sql.Result, error)
+}
 
 type Img struct {
 	Type string `json:"type,omitempty"`
@@ -55,4 +63,16 @@ func (img *Img) Scan(src interface{}) error {
 	img.Url = strings.TrimSuffix(strings.TrimPrefix(fields[1], `"""`), `"""`)
 	img.Alt = strings.TrimSuffix(strings.TrimPrefix(fields[2], `"""`), `"""`)
 	return nil
+}
+
+func structToMap(obj interface{}) (map[string]interface{}, error) {
+	s, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]interface{}
+	if err = json.Unmarshal([]byte(s), &m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }

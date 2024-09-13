@@ -3,7 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -55,6 +55,27 @@ func TestCacheString(t *testing.T) {
 	})
 }
 
+type jsonableStruct struct {
+	atomic bool
+	B      bool    `json:"b"`
+	S      *string `json:"s,omitempty"`
+	F      float64 `json:"f,omitempty"`
+	A      *[]int  `json:"a,omitempty"`
+}
+
+func (j *jsonableStruct) Json() (map[string]interface{}, error) {
+	m, err := structToMap(j)
+	if err != nil {
+		return nil, err
+	}
+	m["__type"] = "::jsonable"
+	return m, nil
+}
+
+func (j *jsonableStruct) Atomic() bool {
+	return j.atomic
+}
+
 func TestCacheJson(t *testing.T) {
 	logger := test.NewMockingLogger(t)
 	client := initRedis(modelscfg, logger, redisOpt{
@@ -64,74 +85,61 @@ func TestCacheJson(t *testing.T) {
 	})
 	cacheDb := &CacheDb{logger, client}
 
-	type jsonS struct {
-		B bool    `json:"b"`
-		S string  `json:"s,omitempty"`
-		F float64 `json:"f,omitempty"`
-		A []int   `json:"a"`
-		J *jsonS  `json:"j,omitempty"`
-	}
-
-	type ti struct {
-		old   map[string]interface{}
-		input interface{}
-		want  map[string]interface{}
-	}
-
-	table := map[string]ti{
-		"update1": {
-			old:   map[string]interface{}{"b": true, "s": "abcd", "f": 10.0, "a": []int{1, 2}, "j": jsonS{F: 20.0, A: []int{}, B: false}},
-			input: map[string]interface{}{"s": stringClearFlag, "f": 1, "a": []int{1, 2, 3}, "j": jsonS{F: -1, A: []int{}, B: false}},
-			want:  map[string]interface{}{"b": true, "s": "", "f": 11.0, "a": []int{1, 2, 3}, "j": map[string]interface{}{"f": 19.0, "a": []interface{}{}, "b": false}},
-		},
-		"cache1": {
-			old:   map[string]interface{}{"j": jsonS{B: true, S: "abcd", F: 10.0, A: []int{7, 11}, J: &jsonS{S: "efgh", A: []int{}, B: false}}},
-			input: jsonS{B: false, S: "foo", F: 11, A: []int{}, J: &jsonS{S: "bar", A: []int{}, B: false}},
-			want:  map[string]interface{}{"b": false, "s": "foo", "f": 21.0, "a": []interface{}{}, "j": map[string]interface{}{"s": "bar", "a": []interface{}{}, "b": false}},
-			// note that json.Unmarshal will convert [] to []interface{}
-		},
-		"cache2": {
-			old:   map[string]interface{}{"j": jsonS{B: true, A: []int{}}},
-			input: jsonS{B: true, S: "foo", F: 11, A: []int{}, J: &jsonS{S: "bar", A: []int{}}},
-			want:  map[string]interface{}{"b": true, "a": []interface{}{}},
-		},
-	}
+	cacheKey := "testjsoncache"
+	s1 := "foo"
+	s2 := ""
+	b, err := json.Marshal(map[string]interface{}{"__type": "::jsonable", "b": true, "s": "abcd", "a": []float64{1, 2}})
+	test.AssertNoError(t, err, "when set cache: %s")
+	cacheDb.SetString(cacheKey, string(b), false)
 
 	t.Cleanup(func() {
-		for k := range table {
-			client.GetDel(defaultCtx, k)
-		}
+		client.GetDel(defaultCtx, cacheKey)
 	})
 
-	t.Run("Test update json", func(t *testing.T) {
-		for k, v := range table {
-			if strings.Contains(k, "update") {
-				got := v.old
-				input, _ := v.input.(map[string]interface{})
-				err := cacheDb.updateJson(&got, &input)
-				test.AssertNoError(t, err)
-				test.AssertEqual(t, v.want, got)
-			}
-		}
-	})
+	table := []struct {
+		input jsonableStruct
+		want  map[string]interface{}
+	}{{
+		input: jsonableStruct{B: true, S: nil, F: 1},
+		want:  map[string]interface{}{"__type": "::jsonable", "b": true, "s": "abcd", "f": 1.0, "a": []interface{}{1.0, 2.0}},
+	}, {
+		input: jsonableStruct{S: &s1, F: -1, A: &[]int{}},
+		want:  map[string]interface{}{"__type": "::jsonable", "b": false, "s": "foo", "f": 0.0, "a": []interface{}{}},
+	}, {
+		input: jsonableStruct{B: true, S: &s2, A: &[]int{2, 1}},
+		want:  map[string]interface{}{"__type": "::jsonable", "b": true, "s": "", "f": 0.0, "a": []interface{}{2.0, 1.0}},
+	}}
 
-	t.Run("Test update json cache", func(t *testing.T) {
-		for k, v := range table {
-			if strings.Contains(k, "cache") {
-				s, _ := json.Marshal(v.old["j"])
-				err := cacheDb.SetString(k, string(s), false)
-				test.AssertNoError(t, err, "when set string: %s")
-				err = cacheDb.UpdateJson(k, v.input)
-				test.AssertNoError(t, err, "when update json: %s")
-				ss, err := cacheDb.QueryString([]string{k})
-				test.AssertNoError(t, err, "when query string: %s")
-				var got map[string]interface{}
-				err = json.Unmarshal([]byte(ss[k]), &got)
-				test.AssertNoError(t, err, "when unmarshal got string: %s")
-				test.AssertEqual(t, v.want, got)
-			}
-		}
-	})
+	for i, v := range table {
+		err = cacheDb.UpdateJson(cacheKey, &v.input)
+		test.AssertNoError(t, err, fmt.Sprintf("when %d-th update: ", i)+"%s")
+		ss, err := cacheDb.QueryString([]string{cacheKey})
+		test.AssertNoError(t, err, fmt.Sprintf("when %d-th query: ", i)+"%s")
+		var got map[string]interface{}
+		err = json.Unmarshal([]byte(ss[cacheKey]), &got)
+		test.AssertNoError(t, err, fmt.Sprintf("when %d-th unmarshal: ", i)+"%s")
+		test.AssertEqual(t, v.want, got)
+	}
+
+	// ATOMIC UPDATE
+	var wg sync.WaitGroup
+	wg.Add(10)
+	routine := func() {
+		defer wg.Done()
+		cacheDb.UpdateJson(cacheKey, &jsonableStruct{F: 1, atomic: true})
+	}
+	for i := 0; i < 10; i++ {
+		go routine()
+	}
+
+	wg.Wait()
+	ss, err := cacheDb.QueryString([]string{cacheKey})
+	test.AssertNoError(t, err, "when query after concurrency: %s")
+	var got map[string]interface{}
+	err = json.Unmarshal([]byte(ss[cacheKey]), &got)
+	test.AssertNoError(t, err, "when unmarshal after concurrency: %s")
+	want := map[string]interface{}{"__type": "::jsonable", "b": false, "s": "", "f": 10.0, "a": []interface{}{2.0, 1.0}}
+	test.AssertEqual(t, want, got)
 }
 
 func TestCachePage(t *testing.T) {
