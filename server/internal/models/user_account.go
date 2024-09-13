@@ -8,8 +8,8 @@ import (
 )
 
 type IUserAccount interface {
-	SetLocalUser(user *User, pswd string) error
-	SetForeignUser(user *User, inbox, sharedInbox string) error
+	SetLocalUser(user User, pswd string) error
+	SetForeignUser(user User, inbox, sharedInbox string) error
 	UpdateForeignInboxes(username, inbox, sharedInbox string) error
 	QueryKeys(username string) (pub string, pri string, err error)
 

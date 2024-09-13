@@ -49,22 +49,20 @@ func Init() {
 	lg := logging.Get()
 	// models should be initialized yet
 	// here directly get the instance
-	authModel := models.AuthInstance(nil, nil)
 	userModel := models.UserInstance(nil, nil, nil)
 	postModel := models.PostInstance(nil, nil, nil)
 
 	var ap *auth.OauthService
 	at := reflect.TypeOf(ap)
 	if services[at] == nil {
-		services[at] = auth.NewService(authModel, lg)
+		services[at] = auth.NewService(userModel, lg)
 	}
 
 	var up *users.UserService
 	ut := reflect.TypeOf(up)
 	if services[ut] == nil {
 		dbs := users.UserDbs{
-			Account: userModel, Info: userModel,
-			Follow: userModel, Auth: authModel,
+			Account: userModel, Info: userModel, Follow: userModel,
 		}
 		up = users.NewService(dbs, cfg, lg)
 		services[ut] = up

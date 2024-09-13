@@ -11,10 +11,10 @@ import (
 
 type IUserInfo interface {
 	IsUserExist(username string) bool
-	QueryUserByUD(username UD) (user User, err error)
-	QueryUserByID(id string) (user User, err error)
+	QueryUserByUD(username UD) (user *User, err error)
+	QueryUserByID(id string) (user *User, err error)
 	// uses: User.Username, User.Nickname, User.Summary, User.Avatar
-	UpdateUser(user *User) error
+	UpdateUser(user User) error
 	QueryInboxes(usernames []UD) (inboxes []string, err error)
 }
 
@@ -136,7 +136,7 @@ func (db *UserDb) QueryUserByID(id string) (*User, error) {
 	return &user, nil
 }
 
-func (db *UserDb) UpdateUser(user *User) error {
+func (db *UserDb) UpdateUser(user User) error {
 	const loc = "Models.User.UpdateUser"
 	const qs = `UPDATE "users" SET "nickname" = $2, "summary" = $3, "avatar" = $4 WHERE "username" = $1;`
 
@@ -154,7 +154,7 @@ func (db *UserDb) UpdateUser(user *User) error {
 		db.cache.UpdateJson("user:"+user.Username.String(), &UserCache{
 			Nickname: u.Nickname, Summary: u.Summary, Avatar: u.Avatar, Lock: u.Lock,
 		})
-	}(*user)
+	}(user)
 	return nil
 }
 

@@ -60,7 +60,7 @@ func TestUser(t *testing.T) {
 		input := User{
 			Username: UD{Username: "aaa"}, Nickname: "AaA", Summary: "abc",
 		}
-		err := userDb.UpdateUser(&input)
+		err := userDb.UpdateUser(input)
 		test.AssertNoError(t, err, "Error when update: %+v")
 		time.Sleep(500 * time.Millisecond)
 

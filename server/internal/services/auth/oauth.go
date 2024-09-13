@@ -55,10 +55,10 @@ func generateToken(u string, s string, exp uint) string {
 
 type OauthService struct {
 	lg logging.Logger
-	db models.IAuthDb
+	db models.IUserAccount
 }
 
-func NewService(db models.IAuthDb, lg logging.Logger) *OauthService {
+func NewService(db models.IUserAccount, lg logging.Logger) *OauthService {
 	return &OauthService{
 		lg: lg,
 		db: db,
@@ -98,7 +98,7 @@ func (service *OauthService) VerifyToken(token, session string) (username string
 }
 
 func (service *OauthService) Login(username, password string) (session string, oauth OauthToken, err error) {
-	p, err := service.db.QueryPasswordOfUser(username)
+	p, err := service.db.QueryPassword(username)
 	if err != nil {
 		return "", oauth, ErrUserNotFound
 	}

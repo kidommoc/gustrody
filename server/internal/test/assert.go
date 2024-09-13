@@ -28,7 +28,7 @@ func AssertEqual(t *testing.T, want interface{}, got interface{}) {
 		return
 	}
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Want and got are not equal:\nwant: %+v\ngot: %+v",
+		t.Errorf("Want and got are not equal:\nwant: %+v\n got: %+v",
 			want, got,
 		)
 	}

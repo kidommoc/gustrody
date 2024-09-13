@@ -18,13 +18,13 @@ type IPostQuery interface {
 	IsPostExist(id string) bool
 	QueryPosts(ids []string) (posts map[string]*Post, err error)
 	QueryPostReplyChain(id string) (replyings []ReplyData, replies []ReplyData, err error)
-	QueryUserContent(user string, maxDate time.Time) (list []Post, err error)
+	QueryUserContent(user string, maxDate time.Time, vsb utils.Vsb) (list []Post, err error)
 }
 
 type IPostSet interface {
-	SetPost(p *Post) error
+	SetPost(p Post) error
 	// uses: id, content, media
-	UpdatePost(p *Post) error
+	UpdatePost(p Post) error
 	RemovePost(id string) error
 }
 
