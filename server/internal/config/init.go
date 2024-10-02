@@ -5,7 +5,6 @@ type Config struct {
 
 	Scheme  string `json:"scheme"`
 	Domain  string `json:"domain"`
-	Port    int    `json:"port"`
 	HmacKey string `json:"hmacKey"`
 
 	// logging
@@ -22,8 +21,9 @@ type Config struct {
 	ImgDir string `json:"imgDir"`
 
 	// perference
-	MaxContentLength int `json:"maxCotentLength"`
-	MaxImgInPost     int `json:"maxImgInPost"`
+	MaxContentLength int  `json:"maxCotentLength"`
+	MaxImgInPost     int  `json:"maxImgInPost"`
+	AllowRegistry    bool `json:"allowRegistry"`
 }
 
 var config *Config

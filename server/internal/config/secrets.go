@@ -22,7 +22,7 @@ var default_secrets map[db_name]string = map[db_name]string{
 	db_redis: "redis",
 }
 
-func loadSecrets() {
+func loadSecrets(secret_paths map[db_name]string) {
 	for k, v := range secret_paths {
 		secret, e := os.ReadFile(v)
 		if e == nil || len(secret) == 0 {

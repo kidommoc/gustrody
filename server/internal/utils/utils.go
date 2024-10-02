@@ -46,7 +46,7 @@ const UsernameRegLiteral = `[A-z]{1}[A-z0-9]+`
 const LocalUsernameRegLiteral = `[A-z]{1}[A-z0-9]{5,19}`
 
 // support domain or ip addr with/without port
-const DomainRegLiteral = `(([A-z0-9\-]+\.)+[A-z]{2,6})|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d{1,5})?`
+const DomainRegLiteral = `(([A-z0-9\-]+\.)+[A-z]{2,6}|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d{1,5})?`
 
 var UsernameReg = regexp.MustCompile(UsernameRegLiteral)
 var LocalUsernameReg = regexp.MustCompile(LocalUsernameRegLiteral)
