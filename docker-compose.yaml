@@ -1,0 +1,88 @@
+version: "3"
+
+services:
+  app:
+    build:
+      context: ./server
+      dockerfile: ./server/Dockerfile
+      tags:
+        - "gustrody:1.0"
+    ports:
+      - "${PORT}:8000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_HOST: db:5432
+      POSTGRES_SECRET_FILE: /run/secrets/postgres_secret
+      REDIS_HOST: redis:6738
+      CACHE_HOST: cache:6739
+      REDIS_SECRET_FILE: /run/secrets/redis_secret
+    volumes:
+      - ./data/static:/app/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:16.1-alpine
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_DB: austrody
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_secret
+    ports:
+      - 5432:5432
+    secrets:
+      - postgres_secret
+    volumes:
+      - ./data/austrody_main:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2.4-alpine
+    environment:
+      SECRET_FILE: "/run/secrets/redis_secret"
+      CONFIG_FILE: "/usr/local/etc/redis.conf"
+    ports:
+      - 6739:6739
+    secrets:
+      - redis_secret
+    volumes:
+      - ./db/startup.sh:/startup.sh
+      - ./db/redis.conf:/redis.conf
+      - austrody_redis:/data
+    restart: unless-stopped
+    entrypoint: /startup.sh
+  
+  cache:
+    image: redis:7.2.4-alpine
+    environment:
+      SECRET_FILE: "/run/secrets/redis_secret"
+      CONFIG_FILE: "/usr/local/etc/redis-cache.conf"
+    ports:
+      - 6738:6739
+    volumes:
+      - ./db/startup.sh:/startup.sh
+      - ./db/redis-cache.conf:/redis.conf
+    secrets:
+      - redis_secret
+    restart: unless-stopped
+    entrypoint: /startup.sh
+
+volumes:
+  # default style: managed by docker
+  # optional style: specify a path as volume
+  austrody_main:
+    external: true
+  austrody_redis:
+    external: true
+
+secrets:
+  postgres_secret:
+    file: ./db/postgres_password
+  redis_secret:
+    file: ./db/redis_password
+
+networks:
+  gustrody:

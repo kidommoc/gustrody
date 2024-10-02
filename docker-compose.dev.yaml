@@ -1,0 +1,92 @@
+version: "3"
+
+services:
+  app:
+    build:
+      context: ./server
+      dockerfile: ./dev.dockerfile
+      tags:
+        - "gustrody:dev"
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_HOST: db:5432
+      POSTGRES_SECRET_FILE: /run/secrets/postgres_secret
+      REDIS_HOST: redis:6739
+      CACHE_HOST: cache:6739
+      REDIS_SECRET_FILE: /run/secrets/redis_secret
+    ports:
+      - "${PORT}:8000"
+    volumes:
+      - ./server:/app
+    secrets:
+      - postgres_secret
+      - redis_secret
+    depends_on:
+      - db
+      - redis
+      - cache
+    restart: unless-stopped
+
+  db:
+    image: postgres:16.1-alpine
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_DB: austrody
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_secret
+    ports:
+      - 5432:5432
+    secrets:
+      - postgres_secret
+    volumes:
+      - austrody_main_dev:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2.4-alpine
+    environment:
+      SECRET_FILE: "/run/secrets/redis_secret"
+      CONFIG_FILE: "/usr/local/etc/redis.conf"
+    ports:
+      - 6739:6739
+    secrets:
+      - redis_secret
+    volumes:
+      - ./db/startup.sh:/startup.sh
+      - ./db/redis.conf:/redis.conf
+      - austrody_redis_dev:/data
+    restart: unless-stopped
+    entrypoint: /startup.sh
+  
+  cache:
+    image: redis:7.2.4-alpine
+    environment:
+      SECRET_FILE: "/run/secrets/redis_secret"
+      CONFIG_FILE: "/usr/local/etc/redis-cache.conf"
+    ports:
+      - 6738:6739
+    volumes:
+      - ./db/startup.sh:/startup.sh
+      - ./db/redis-cache.conf:/redis.conf
+    secrets:
+      - redis_secret
+    restart: unless-stopped
+    entrypoint: /startup.sh
+
+volumes:
+  # default style: managed by docker
+  # optional style: specify a path as volume
+  austrody_main_dev:
+    external: true
+  austrody_redis_dev:
+    external: true
+
+secrets:
+  postgres_secret:
+    file: ./db/postgres_password
+  redis_secret:
+    file: ./db/redis_password
+
+networks:
+  gustrody:

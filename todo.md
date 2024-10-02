@@ -5,10 +5,10 @@
 - [x] logging
 - [x] database (main and cache) ***
 - [x] function: media: image
-- [ ] function: account
+- [x] function: account
+- [x] containerize
 - [ ] federalize ***
-- [ ] function: mentions in posts
 - [ ] concurrency **
-- [ ] function: fanout ***
+- [ ] function: mentions in posts
+- [ ] function: timeline-fanout ***
 - [ ] function: notification **
-- [ ] containerize
