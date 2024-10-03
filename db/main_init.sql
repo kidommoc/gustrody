@@ -1,19 +1,4 @@
--- DROP DATABASE IF EXISTS austrody;
--- 
--- CREATE DATABASE austrody
---     WITH
---     OWNER = penguin
---     ENCODING = 'UTF8'
---     LC_COLLATE = 'en_US.utf8'
---     LC_CTYPE = 'en_US.utf8'
---     LOCALE_PROVIDER = 'libc'
---     TABLESPACE = pg_default
---     CONNECTION LIMIT = -1
---     IS_TEMPLATE = False;
-
-CREATE TYPE vsb AS ENUM (
-  'public', 'follower', 'direct'
-);
+CREATE TYPE vsb AS ENUM ('public', 'private', 'direct');
 
 CREATE TYPE img AS (
   "type" text,
@@ -21,10 +6,12 @@ CREATE TYPE img AS (
   "alt" text
 );
 
+-- USER
+
 CREATE TABLE IF NOT EXISTS "users" (
   "username" text,
   "foreign" boolean NOT NULL,
-  "id" text NOT NULL UNIQUE,
+  "fid" text NOT NULL UNIQUE,
   "nickname" text NOT NULL,
   "summary" text DEFAULT '',
   "avatar" img,
@@ -36,8 +23,6 @@ CREATE TABLE IF NOT EXISTS "users" (
     ("foreign" = FALSE AND "pri_key" <> NULL) OR "foreign" = TRUE
   )
 );
-
-CREATE INDEX "user_id" ON "users"("id");
 
 CREATE TABLE IF NOT EXISTS "user_preferences" (
   "username" text,
@@ -58,13 +43,23 @@ CREATE TABLE IF NOT EXISTS "foreign_inboxes" (
 CREATE TABLE IF NOT EXISTS "follow" (
   "from" text,
   "to" text CHECK ("to" <> "from"),
+  "date" timestamp,
+  "fid" text UNIQUE,
+  "is_req" boolean DEFAULT FALSE,
   PRIMARY KEY ("from", "to"),
   FOREIGN KEY ("from") REFERENCES "users"("username"),
   FOREIGN KEY ("to") REFERENCES "users"("username")
 );
 
+-- USER: INDEX and VIEW
+
+CREATE INDEX "user_fid" ON "users"("fid");
+CREATE INDEX "follow_fid" ON "follow"("fid");
+
 CREATE INDEX "user_follows" ON "follow" ("from");
 CREATE INDEX "user_be_followed" ON "follow" ("to");
+
+CREATE INDEX "follow_ntf" ON "follow"("to", "date");
 
 CREATE VIEW "follow_data" ("user", "followings", "followers") AS
   WITH "followings" AS (
@@ -84,7 +79,9 @@ CREATE VIEW "follow_data" ("user", "followings", "followers") AS
   FULL JOIN "followers"
     ON "users"."username" = "followers"."u";
 
-CREATE TABLE IF NOT EXISTS posts (
+-- POST
+
+CREATE TABLE IF NOT EXISTS "posts" (
   "id" varchar(36) NOT NULL,
   "tombstone" boolean DEFAULT FALSE,
   "fid" text NOT NULL UNIQUE,
@@ -97,42 +94,58 @@ CREATE TABLE IF NOT EXISTS posts (
   FOREIGN KEY ("user") REFERENCES "users"("username")
 );
 
-CREATE INDEX "posters" ON "posts" ("user");
-
 CREATE TABLE IF NOT EXISTS "reply" (
   "id" varchar(36) UNIQUE,
   "tgt" varchar(36),
   "tgt_user" text,
+  "date" timestamp,
   PRIMARY KEY ("id", "tgt"),
   FOREIGN KEY ("id") REFERENCES "posts"("id"),
   FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
   FOREIGN KEY ("tgt_user") REFERENCES "users"("username")
 );
 
-CREATE INDEX "post_replies" ON "reply"("tgt");
-
 CREATE TABLE IF NOT EXISTS "like" (
   "user" text,
   "tgt" varchar(36),
+  "tgt_user" text,
+  "date" timestamp,
+  "fid" text UNIQUE,
   PRIMARY KEY ("user", "tgt"),
   FOREIGN KEY ("user") REFERENCES "users"("username"),
-  FOREIGN KEY ("tgt") REFERENCES "posts"("id")
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
+  FOREIGN KEY ("tgt_user") REFERENCES "users"("username")
 );
-
-CREATE INDEX "post_likes" ON "like"("tgt");
 
 CREATE TABLE IF NOT EXISTS "share" (
   "user" text NOT NULL,
   "tgt" varchar(36) NOT NULL,
-  "date" timestamp NOT NULL,
+  "tgt_user" text,
   "vsb" vsb NOT NULL,
+  "date" timestamp NOT NULL,
+  "fid" text UNIQUE,
   PRIMARY KEY ("user", "tgt"),
   FOREIGN KEY ("user") REFERENCES "users"("username"),
-  FOREIGN KEY ("tgt") REFERENCES "posts"("id")
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
+  FOREIGN KEY ("tgt_user") REFERENCES "users"("username")
 );
 
+-- POST: INDEX and VIEW
+
+CREATE INDEX "post_replies" ON "reply"("tgt");
+CREATE INDEX "post_likes" ON "like"("tgt");
 CREATE INDEX "post_shares" ON "share"("tgt");
-CREATE INDEX "sharer" ON "share"("user");
+
+CREATE INDEX "post_fid" ON "posts"("fid");
+CREATE INDEX "like_fid" ON "like"("fid");
+CREATE INDEX "share_fid" ON "share"("fid");
+
+CREATE INDEX "post_out" ON "posts" ("user", "date");
+CREATE INDEX "share_out" ON "share"("user", "date");
+
+CREATE INDEX "reply_ntf" ON "reply"("tgt_user", "date");
+CREATE INDEX "like_ntf" ON "like"("tgt_user", "date");
+CREATE INDEX "share_ntf" ON "share"("tgt_user", "date");
 
 CREATE VIEW "post_data" AS
   WITH "r" AS (
@@ -148,7 +161,7 @@ CREATE VIEW "post_data" AS
     FROM "like" GROUP BY "tgt"
   ), "ps" AS (
     SELECT
-      "posts".*,
+      "posts"."id",
       COALESCE("r"."c", 0) AS "replies",
       COALESCE("s"."c", 0) AS "shares",
       COALESCE("l"."c", 0) AS "likes"
@@ -159,11 +172,3 @@ CREATE VIEW "post_data" AS
   )
   SELECT "ps".*, "reply"."tgt" AS "replying", "reply"."tgt_user" AS "reply_to"
   FROM "ps" LEFT JOIN "reply" ON "ps"."id" = "reply"."id";
-
-CREATE VIEW "user_content" AS 
-    SELECT "user", "tgt" AS "id", "date", "vsb", "user" AS "shared_by"
-    FROM "share"
-  UNION
-    SELECT "user", "id", "date", "vsb", NULL AS "shared_by"
-    FROM "posts"
-  ORDER BY "date" DESC;

@@ -4,6 +4,10 @@ LABEL repo="github.com/kidommoc/gustrody"
 
 COPY go.mod go.sum main.go internal/ /app/
 WORKDIR /app
+
+# China specified
+RUN go env -w GOPROXY=https://goproxy.cn,direct
+
 RUN go mod download
 RUN go build -o ./build/austrody
 

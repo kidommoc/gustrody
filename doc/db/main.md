@@ -6,26 +6,31 @@ Use PostgreSql. Database: `austrody`
 
 ## TYPES
 
-- vsb: visibility of post
+- vsb *ENUM*: visibility of post
 - img: image
 
 ```sql
-CREATE TYPE vsb AS ENUM (
-  0, 1, 2
-);
+CREATE TYPE "vsb" AS ENUM ('public', 'private', 'direct');
 
-CREATE TYPE img AS (
+CREATE TYPE "img" AS (
   "type" text,
   "url" text,
   "alt" text
 );
 ```
 
+## INDEX
+
+- `<this>_out`: for constructing timeline
+- `<this>_ntf`: for constructing notification
+- `<other>_<field>`: foreign primary for joining
+- `<this>_<field>`: self field for query
+
 ## TABLE: `users`
 
 - username *PRIMARY*: `text`
 - foreign: `boolean` marking whether a foreign user
-- id *INDEX*: `text` as foreign user's activitypub id
+- fid: `text` as foreign user's federal id
 - nickname: `text`
 - summary: `text`
 - avatar *NULLABLE*: `img`
@@ -35,7 +40,7 @@ CREATE TYPE img AS (
 
 CONSTRAINT:
 
-- if `foreign`, `id` must not null; else `pri_key` must not null.
+- if not `foreign`, `pri_key` must not null.
 
 > NOTE: for foreign user, `username` syntax is `username@domain`.
 
@@ -43,7 +48,7 @@ CONSTRAINT:
 CREATE TABLE IF NOT EXISTS "users" (
   "username" text,
   "foreign" boolean NOT NULL,
-  "id" text NOT NULL UNIQUE,
+  "fid" text NOT NULL UNIQUE,
   "nickname" text NOT NULL,
   "summary" text DEFAULT '',
   "avatar" img,
@@ -56,13 +61,13 @@ CREATE TABLE IF NOT EXISTS "users" (
   )
 );
 
-CREATE INDEX "user_id" ON "users"("id");
+CREATE INDEX "user_fid" ON "users"("fid");
 
 CREATE VIEW "user_content" AS 
-    SELECT "user", "tgt" AS "id", "date", "vsb", "user" AS "shared_by"
+    SELECT "user", "tgt" AS "fid", "date", "vsb", "user" AS "shared_by"
     FROM "share"
   UNION
-    SELECT "user", "id", "date", "vsb", NULL AS "shared_by"
+    SELECT "user", "fid", "date", "vsb", NULL AS "shared_by"
     FROM "posts"
   ORDER BY "date" DESC;
 ```
@@ -93,7 +98,7 @@ ORDER BY "act" DESC
 
 ## TABLE: `user_preferences`
 
-- username: `text`, referencing `users.username`
+- username *PRIMARY, FOREIGN*: `text`, referencing `users.username`
 - password: `text` as encrypted password
 - preferences: `jsonb`
 
@@ -111,7 +116,7 @@ CREATE TABLE IF NOT EXISTS "user_preferences" (
 
 ## TABLE: `foreign_inboxes`
 
-- username: `text`, referencing `users.username`
+- username *PRIMARY, FOREIGN*: `text`, referencing `users.username`
 - inbox: `text` as user inbox url
 - shared *NULLABLE*: `text` as instance inbox url
 
@@ -127,8 +132,11 @@ CREATE TABLE IF NOT EXISTS "foreign_inboxes" (
 
 ## TABLE: `follow`
 
-- from *PRIMARY, INDEX*: `text`, referencing `users.username`
-- to *PRIMARY, INDEX*: `text`, referencing `users.username`
+- from *PRIMARY, FOREIGN*: `text`, referencing `users.username`
+- to *PRIMARY, FOREIGN*: `text`, referencing `users.username`
+- date: `timestamp`
+- fid *UNIQUE*: `text` as federal id of this activity
+- is_req: `bool` whether is still a unhandled request
 
 CONSTRAINT:
 
@@ -138,6 +146,9 @@ CONSTRAINT:
 CREATE TABLE IF NOT EXISTS "follow" (
   "from" text,
   "to" text CHECK ("to" <> "from"),
+  "date" timestamp,
+  "fid" text UNIQUE,
+  "is_req" boolean DEFAULT FALSE,
   PRIMARY KEY ("from", "to"),
   FOREIGN KEY ("from") REFERENCES "users"("username"),
   FOREIGN KEY ("to") REFERENCES "users"("username")
@@ -145,6 +156,8 @@ CREATE TABLE IF NOT EXISTS "follow" (
 
 CREATE INDEX "user_follows" ON "follow" ("from");
 CREATE INDEX "user_be_followed" ON "follow" ("to");
+CREATE INDEX "follow_ntf" ON "follow"("to", "date");
+CREATE INDEX "follow_fid" ON "follow"("fid");
 
 CREATE VIEW "follow_data" ("user", "followings", "followers") AS
   WITH "followings" AS (
@@ -169,8 +182,9 @@ CREATE VIEW "follow_data" ("user", "followings", "followers") AS
 
 - id *PRIMARY*: `text` as uuid
 - tombstone: `boolean` as whether a removed post
+- fid *UNIQUE*: `text` as federal id of this post.
 - url: `text` as url
-- user *INDEX*: `text`, referencing `user.username`
+- user *FOREIGN*: `text`, referencing `user.username`
 - date: `timestap`
 - vsb: `vsb` as visibility of post
 - content: `text`
@@ -190,7 +204,8 @@ CREATE TABLE IF NOT EXISTS "posts" (
   FOREIGN KEY ("user") REFERENCES "users"("username")
 );
 
-CREATE INDEX "posters" ON "posts" ("user");
+CREATE INDEX "post_out" ON "posts" ("user", "date");
+CREATE INDEX "post_fid" ON "posts"("fid");
 
 CREATE VIEW "post_data" AS
   WITH "r" AS (
@@ -219,18 +234,19 @@ CREATE VIEW "post_data" AS
   FROM "ps" LEFT JOIN "reply" ON "ps"."id" = "reply"."id";
 ```
 
-*Note*: `user` syntax is `username` for local users or `username@domain` for foreign users.
-
 ## TABLE: `reply`
 
 - id *PRIMARY, FOREIGN*: `text` as uuid of the replying post, referencing to `posts.id`
-- reply *PRIMARY, FOREIGN, INDEX*: `text` as uuid of the post replied, referencing to `posts.id`
+- tgt *PRIMARY, FOREIGN*: `text` as uuid of the post replied, referencing to `posts.id`
+- tgt_user *FOREIGN*: `text` as publisher of the target post, referencing to `users.username`
+- date: `timestamp`
 
 ```sql
 CREATE TABLE IF NOT EXISTS "reply" (
   "id" varchar(36) UNIQUE,
   "tgt" varchar(36),
   "tgt_user" text,
+  "date" timestamp,
   PRIMARY KEY ("id", "tgt"),
   FOREIGN KEY ("id") REFERENCES "posts"("id"),
   FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
@@ -238,6 +254,7 @@ CREATE TABLE IF NOT EXISTS "reply" (
 );
 
 CREATE INDEX "post_replies" ON "reply"("tgt");
+CREATE INDEX "reply_ntf" ON "reply"("tgt_user", "date");
 ```
 
 ### Query
@@ -265,40 +282,54 @@ SELECT "id", "tgt" FROM "rs";
 ## TABLE: `like`
 
 - user *PRIMARY*: `text`, referencing `user.username`
-- id *PRIMARY, FOREIGN, INDEX*: `text` as uuid, referencing to `posts.id`
+- tgt *PRIMARY, FOREIGN, INDEX*: `text` as uuid, referencing to `posts.id`
+- tgt_user *FOREIGN*: `text` as publisher of the target post, referencing `user.username`
+- date: `timestamp`
+- fid *UNIQUE*: `text` as federal id of this activity
 
 ```sql
 CREATE TABLE IF NOT EXISTS "like" (
   "user" text,
   "tgt" varchar(36),
+  "tgt_user" text,
+  "date" timestamp,
+  "fid" text UNIQUE,
   PRIMARY KEY ("user", "tgt"),
   FOREIGN KEY ("user") REFERENCES "users"("username"),
-  FOREIGN KEY ("tgt") REFERENCES "posts"("id")
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
+  FOREIGN KEY ("tgt_user") REFERENCES "users"("username")
 );
 
 CREATE INDEX "post_likes" ON "like"("tgt");
+CREATE INDEX "like_ntf" ON "like"("tgt_user", "date");
+CREATE INDEX "like_fid" ON "like"("fid");
 ```
 
 ## TABLE: `share`
 
-- user *PRIMARY, INDEX*: `text` as username
-- id *PRIMARY, FOREIGN, INDEX*: `text` as uuid, referencing to `posts."id"`
-- date: `timestamp`
+- user *PRIMARY, FOREIGN*: `text` as username
+- tgt *PRIMARY, FOREIGN*: `text` as uuid, referencing to `posts."id"`
+- tgt_user *FOREIGN*: `text` as publisher of the target post, referencing `user.username`
 - vsb: `vsb` as visibility of sharing
+- date: `timestamp`
+- fid *UNIQUE*: `text` as federal id of this activity
 
 ```sql
 CREATE TABLE IF NOT EXISTS "share" (
   "user" text NOT NULL,
   "tgt" varchar(36) NOT NULL,
-  "date" timestamp NOT NULL,
+  "tgt_user" text,
   "vsb" vsb NOT NULL,
+  "date" timestamp NOT NULL,
+  "fid" text UNIQUE,
   PRIMARY KEY ("user", "tgt"),
   FOREIGN KEY ("user") REFERENCES "users"("username"),
-  FOREIGN KEY ("tgt") REFERENCES "posts"("id")
+  FOREIGN KEY ("tgt") REFERENCES "posts"("id"),
+  FOREIGN KEY ("tgt_user") REFERENCES "users"("username")
 );
 
 CREATE INDEX "post_shares" ON "share"("tgt");
-CREATE INDEX "sharer" ON "share"("user");
+CREATE INDEX "share_fid" ON "share"("fid");
+CREATE INDEX "share_out" ON "share"("user", "date");
+CREATE INDEX "share_ntf" ON "share"("tgt_user", "date");
 ```
-
-*Note*: `user` syntax is `username` for local users or `username@domain` for foreign users.

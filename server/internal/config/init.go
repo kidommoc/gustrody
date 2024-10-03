@@ -13,8 +13,10 @@ type Config struct {
 	LogLevel int    `json:"logLevel"`
 
 	// database
+	PqHost   string `json:"pqHost"`
 	PqUser   string `json:"pqUser"`
 	PqSecret string `json:"pqSecret"`
+	RdHost   string `json:"rdHost"`
 	RdSecret string `json:"rdSecret"`
 
 	// static files

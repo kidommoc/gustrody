@@ -23,10 +23,15 @@ func loadEnv() {
 	config.Domain = os.Getenv("DOMAIN")
 	// check site
 	if !utils.DomainReg.MatchString(config.Domain) {
-		msg := fmt.Sprintf("Your site domain is illegal! regex:\n    %s", utils.DomainReg.String())
-		panic(msg)
+		panic("Your site domain is illegal!")
 	}
 	config.Domain = utils.TrimPath(config.Domain)
+
+	config.PqHost = os.Getenv("POSTGRES_HOST")
+	config.RdHost = os.Getenv("CACHE_HOST")
+	if config.PqHost == "" || config.RdHost == "" {
+		panic("PostgreSQL host or Redis host is not found!")
+	}
 
 	// site scheme. http or https
 	config.Scheme = os.Getenv("SCHEME")
@@ -71,7 +76,7 @@ func loadEnv() {
 	config.LogLevel = logLevel
 
 	// postgresql user. default: penguin
-	config.PqUser = os.Getenv("POSTGRES_USER")
+	config.PqUser = os.Getenv("DB_USER")
 	if config.PqUser == "" {
 		config.PqUser = "penguin"
 	}
